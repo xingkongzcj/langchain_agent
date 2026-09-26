@@ -14,3 +14,6 @@ __pycache__/
 
 # 向量库数据（如果后续有）
 chroma_vsdb/
+
+# 本地参考资料，不提交 Git
+_reference/
