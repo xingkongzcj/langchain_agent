@@ -28,10 +28,10 @@
 └──────────────────────────┼─────────────────────┼────────────┘
                            │                     │
               ┌────────────▼──────┐    ┌─────────▼──────────────┐
-              │  MySQL 8.0        │    │ PostgreSQL + pgvector  │
-              │ 课程/文档/题目/    │    │ 文档向量 + 聊天记忆     │
-              │ 错题/复习计划      │    └────────────────────────┘
-              └───────────────────┘
+              │  MySQL 8.0        │    │  Chroma 向量库（本地）   │
+              │ 课程/文档/题目/    │    │ 文档向量 + metadata     │
+              │ 错题/复习计划      │    │ 持久化目录 ./chroma_db  │
+              └───────────────────┘    └────────────────────────┘
                            │
               ┌────────────▼──────────────────────────┐
               │  硅基流动 SiliconFlow（OpenAI 兼容接口）  │
@@ -39,20 +39,20 @@
               └───────────────────────────────────────┘
 ```
 
-### 1.2 数据库分工
+### 1.2 存储分工
 
-| 数据库 | 职责 | 关键表 |
+| 存储 | 职责 | 关键内容 |
 | --- | --- | --- |
-| MySQL 8.0 | 业务结构化数据 | courses、documents、quiz_batches、questions、mistakes、review_plans、review_items |
-| PostgreSQL + pgvector | 向量存储 + 聊天记忆 | document_embeddings（向量表）、chat_messages（会话记忆） |
+| MySQL 8.0 | 唯一业务数据库 | courses、documents、quiz_batches、questions、mistakes、review_plans、review_items |
+| Chroma（本地持久化） | 向量存储 | 文档向量 + metadata，按课程分 collection |
 
 ### 1.3 关键数据流
 
-**文档入库**：上传文件 → 类型/大小校验 → LangChain Loader 解析 → TextSplitter 切分 → Embedding 向量化 → 写入 PostgreSQL（pgvector）→ 写入 MySQL（documents）。
+**文档入库**：上传文件 → 类型/大小校验 → LangChain Loader 解析 → TextSplitter 切分 → Embedding 向量化 → 写入 Chroma → 写入 MySQL（documents）。
 
-**智能问答**：提问 → Embedding 向量化 → pgvector 相似度检索（top_k）→ 拼接上下文 → 填充 Prompt → LLM 生成 → 返回回答 + 引用来源。
+**智能问答**：提问 → Embedding 向量化 → Chroma 相似度检索（top_k）→ 拼接上下文 → 填充 Prompt → LLM 生成 → 返回回答 + 引用来源。
 
-**自动出题**：出题参数 → pgvector 检索相关片段 → 填充出题 Prompt → LLM 生成结构化 JSON → 解析校验 → 写入 MySQL（questions）→ 返回。
+**自动出题**：出题参数 → Chroma 检索相关片段 → 填充出题 Prompt → LLM 生成结构化 JSON → 解析校验 → 写入 MySQL（questions）→ 返回。
 
 **错题本**：判题答错 → 写入 MySQL（mistakes）→ 供错题本与复习计划使用。
 
@@ -65,11 +65,11 @@
 | 语言 | Python 3.11 | 稳定、性能与生态均衡，符合项目规范要求 |
 | Web 框架 | FastAPI | 异步高性能、原生 Pydantic v2 校验、自动生成 OpenAPI 文档 |
 | AI 编排 | LangChain | 内置文档 Loader、TextSplitter、向量库、Prompt 模板等 RAG 抽象 |
-| 业务库 | MySQL 8.0 | 成熟稳定，适合关系型结构化业务数据 |
-| 向量库 | PostgreSQL + pgvector | 一个库同时承载向量检索与聊天记忆，减少组件数量 |
+| 业务库 | MySQL 8.0 | 成熟稳定，作为唯一业务数据库存储结构化数据 |
+| 向量库 | Chroma（本地持久化向量库） | 轻量、本地持久化、无需额外服务，`chromadb` 与 `langchain-chroma` 已在依赖中，适合快速原型开发 |
 | LLM/Embedding | SiliconFlow OpenAI 兼容接口 | 国内直连、按量付费，LLM（Qwen）+ Embedding（BAAI/bge-m3）统一接入 |
 | 前端 | 原生 HTML/CSS/JS | 无构建工具、无框架依赖 |
-| 部署 | Docker + docker-compose | MySQL、PostgreSQL、Backend 一键编排启动 |
+| 部署 | Docker + docker-compose | 本地仅需启动 MySQL 一个容器 |
 
 ## 3. 数据库表设计
 
@@ -161,33 +161,14 @@
 | completed | TINYINT(1) | DEFAULT 0 | 是否完成 |
 | created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
 
-### 3.2 PostgreSQL（`study_mate`）
+### 3.2 Chroma 向量库设计
 
-#### document_embeddings（文档向量表，pgvector）
-
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | BIGSERIAL | PRIMARY KEY | 向量 ID |
-| course_id | BIGINT | NOT NULL，索引 | 所属课程 |
-| document_id | BIGINT | NOT NULL，索引 | 对应 MySQL documents.id |
-| chunk_index | INT | NOT NULL | 块序号 |
-| content | TEXT | NOT NULL | 文本片段 |
-| embedding | vector(1024) | NOT NULL | 向量（BAAI/bge-m3，1024 维） |
-| metadata | JSONB | 可空 | 附加元数据 |
-| created_at | TIMESTAMPTZ | DEFAULT now() | 创建时间 |
-
-> 索引：`CREATE INDEX ON document_embeddings USING ivfflat (embedding vector_cosine_ops);`（或 HNSW）
-
-#### chat_messages（聊天记忆表）
-
-| 字段 | 类型 | 约束 | 说明 |
-| --- | --- | --- | --- |
-| id | BIGSERIAL | PRIMARY KEY | 消息 ID |
-| session_id | VARCHAR(64) | NOT NULL，索引 | 会话 ID |
-| course_id | BIGINT | NOT NULL，索引 | 所属课程 |
-| role | VARCHAR(16) | NOT NULL | user / assistant |
-| content | TEXT | NOT NULL | 消息内容 |
-| created_at | TIMESTAMPTZ | DEFAULT now() | 创建时间 |
+- **持久化目录**：`./chroma_db`（由 `CHROMA_PERSIST_DIR` 配置）；
+- **Collection 命名**：每个课程一个独立 collection，命名规则 `course_{course_id}`；
+- **存储内容**：文档切分后的文本片段（`page_content`）+ `metadata`；
+- **Metadata 字段**：`document_id`（对应 MySQL documents.id）、`filename`、`chunk_index`、`source`；
+- **Embedding 模型**：`BAAI/bge-m3`（1024 维，通过 SiliconFlow OpenAI 兼容接口调用）；
+- **同步删除**：删除文档/课程时，需同步删除对应 collection 中的向量，防止"幽灵"数据。
 
 ## 4. API 接口设计（RESTful）
 
@@ -290,8 +271,9 @@ langchain_agent/
 │   │   └── exceptions.py        # 全局异常处理
 │   ├── db/                      # 数据库连接
 │   │   ├── __init__.py
-│   │   ├── mysql.py             # SQLAlchemy MySQL 连接
-│   │   └── postgres.py          # PostgreSQL + pgvector 连接
+│   │   ├── base.py              # SQLAlchemy ORM 基类
+│   │   ├── mysql.py             # MySQL 连接与会话管理
+│   │   └── chroma.py            # Chroma 向量库工厂 + Embedding
 │   ├── models/                  # SQLAlchemy ORM 模型
 │   │   ├── __init__.py
 │   │   ├── course.py
@@ -322,9 +304,6 @@ langchain_agent/
 │   │   ├── quiz_service.py      # 出题 + 判题
 │   │   ├── mistake_service.py   # 错题本
 │   │   └── review_service.py    # 复习计划
-│   ├── vectorstore/             # 向量库封装
-│   │   ├── __init__.py
-│   │   └── pgvector_store.py    # pgvector 客户端与 embedding 封装
 │   └── prompts/
 │       ├── __init__.py
 │       └── templates.py         # 问答/出题/复习计划 Prompt 模板
@@ -343,6 +322,7 @@ langchain_agent/
 │   ├── PRD.md
 │   ├── SPEC.md
 │   └── AGENTS.md
+├── chroma_db/                   # Chroma 持久化目录（运行时生成，git 忽略）
 ├── .env.example
 ├── .env                         # git 忽略
 ├── .gitignore
@@ -357,8 +337,8 @@ langchain_agent/
 1. **Embedding 一致性**：文档入库与问答检索必须使用同一 embedding 模型（BAAI/bge-m3），避免向量空间不一致；
 2. **文档解析**：不同格式使用对应 LangChain Loader，解析异常需捕获并标记失败；
 3. **结构化出题**：LLM 输出 JSON 需用 Prompt 约束格式，返回后解析校验与重试，失败降级；
-4. **双库一致性**：删除文档/课程时需同步删除 PostgreSQL 向量与 MySQL 记录，防止"幽灵"数据；
-5. **pgvector 索引**：向量量大时建立 ivfflat/hnsw 索引提升检索性能；
+4. **向量同步删除**：删除文档/课程时需同步删除 Chroma 中的向量与 MySQL 记录，防止"幽灵"数据；
+5. **Chroma 持久化**：指定 `persist_directory` 后使用 PersistentClient，数据自动落盘，无需手动 persist；
 6. **Prompt 模板管理**：问答/出题/复习计划 Prompt 独立维护；
 7. **配置安全**：密钥通过 `.env` 注入，`.env` 加入 `.gitignore`。
 
@@ -368,15 +348,15 @@ langchain_agent/
 
 | 服务 | 镜像/构建 | 说明 |
 | --- | --- | --- |
-| mysql | `mysql:8.0` | 业务库，暴露 3306 |
-| postgres | `pgvector/pgvector:pg16` | 向量库 + 记忆，暴露 5432 |
-| backend | 基于 `Dockerfile` 构建 | FastAPI 应用，暴露 8000 |
+| mysql | `mysql:8.0` | 唯一业务数据库，暴露 3306 |
+
+> Chroma 为本地持久化向量库（进程内运行），无需独立容器。
 
 ### 7.2 启动方式
 
 ```bash
-# 一键构建并启动全部容器
-docker-compose up --build
+# 启动 MySQL 容器
+docker-compose up -d
 
 # 本地开发（非 Docker）
 pip install -r requirements.txt
@@ -399,17 +379,13 @@ EMBEDDING_MODEL=BAAI/bge-m3
 # 检索参数
 TOP_K=4
 
-# MySQL
-MYSQL_HOST=mysql
-MYSQL_PORT=3306
+# MySQL（唯一业务数据库）
+MYSQL_HOST=localhost
+MYSQL_PORT=3307
 MYSQL_USER=root
 MYSQL_PASSWORD=password
 MYSQL_DATABASE=study_mate
 
-# PostgreSQL
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-POSTGRES_DATABASE=study_mate
+# Chroma 向量库
+CHROMA_PERSIST_DIR=./chroma_db
 ```

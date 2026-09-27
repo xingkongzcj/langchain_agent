@@ -8,7 +8,7 @@
 
 - **项目名称**：智学助手（StudyMate）
 - **项目定位**：基于 LangChain 的课程知识库问答与出题智能体
-- **技术栈**：FastAPI + LangChain + MySQL + PostgreSQL + Docker
+- **技术栈**：FastAPI + LangChain + MySQL + Chroma + Docker
 - **运行时**：Python 3.11
 - **需求文档**：`docs/PRD.md`
 - **技术规范**：`docs/SPEC.md`（**实现前必读**，数据模型、API、目录结构均以此为准）
@@ -22,8 +22,8 @@ pip install -r requirements.txt
 # 复制环境变量样例并填写密钥
 # 将 .env.example 复制为 .env，填写 SILICONFLOW_API_KEY 等
 
-# 启动 MySQL 与 PostgreSQL（Docker）
-docker-compose up -d mysql postgres
+# 启动 MySQL（Docker）
+docker-compose up -d mysql
 
 # 启动开发服务器
 uvicorn app.main:app --reload --port 8000
@@ -32,7 +32,7 @@ uvicorn app.main:app --reload --port 8000
 pytest
 ```
 
-> 启动前确保 `.env` 已配置有效的 `SILICONFLOW_API_KEY`，且 MySQL、PostgreSQL 已启动，否则问答、出题、复习计划等接口会失败。
+> 启动前确保 `.env` 已配置有效的 `SILICONFLOW_API_KEY`，且 MySQL 已启动，否则问答、出题、复习计划等接口会失败。
 
 ## 3. 开发规范（强制）
 
@@ -112,7 +112,7 @@ class ApiResponse(BaseModel, Generic[T]):
 
 1. **密钥安全**：`SILICONFLOW_API_KEY` 等密钥只能通过 `.env` 读取，**严禁硬编码**或打印到日志/终端。
 2. **向量一致性**：文档入库与问答检索必须使用**同一个 embedding 模型**（BAAI/bge-m3）。
-3. **双库同步删除**：删除文档或课程时，必须同步删除 PostgreSQL（pgvector）向量与 MySQL 记录，保持数据一致。
+3. **Chroma 与 MySQL 同步删除**：删除文档或课程时，必须同步删除 Chroma 中的向量与 MySQL 记录，保持数据一致。
 4. **结构化出题**：LLM 返回的题目 JSON 必须解析校验，异常时重试，失败需降级处理，不能直接崩溃。
 5. **输入校验**：文件上传校验类型与大小；用户输入做基本转义；数据库操作使用 ORM 参数化。
 6. **Docker 兼容**：涉及数据库连接时，host/port 通过环境变量读取，兼容 Docker 与本地开发两种场景。
@@ -122,7 +122,7 @@ class ApiResponse(BaseModel, Generic[T]):
 
 - 运行时：Python 3.11；
 - 依赖：见 `requirements.txt`；
-- 数据库：MySQL 8.0（业务）+ PostgreSQL 16 + pgvector（向量与记忆）；
+- 数据库：MySQL 8.0（业务）+ Chroma（本地持久化向量库）；
 - 环境变量：见 `.env.example`，本地实际配置写入 `.env`（不提交）。
 
 ## 9. AI 代码审查要点（收尾阶段）
