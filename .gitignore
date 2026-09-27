@@ -17,3 +17,6 @@ chroma_vsdb/
 
 # 本地参考资料，不提交 Git
 _reference/
+
+# 忽略本地向量库
+chroma_db/

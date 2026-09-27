@@ -11,6 +11,7 @@ from app.core.exceptions import register_exception_handlers
 from app.core.response import ApiResponse
 from app.db.chroma import check_chroma
 from app.db.mysql import check_mysql, init_db
+from app.routers import courses, documents
 from app.schemas.health import HealthData
 
 # 配置日志
@@ -47,6 +48,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 注册业务路由
+app.include_router(courses.router)
+app.include_router(documents.router)
 
 # 启动信息（不打印密钥）
 logger.info("LLM 模型: %s", settings.llm_model)

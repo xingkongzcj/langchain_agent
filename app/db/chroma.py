@@ -1,9 +1,13 @@
 """Chroma 向量库初始化模块。"""
 
+import logging
+
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def get_embeddings() -> OpenAIEmbeddings:
@@ -36,3 +40,13 @@ def check_chroma() -> bool:
         return True
     except Exception:
         return False
+
+
+def delete_collection(collection_name: str) -> None:
+    """删除指定名称的 Chroma collection（不存在则忽略）。"""
+    try:
+        vectorstore = get_vectorstore(collection_name)
+        vectorstore._client.delete_collection(collection_name)
+        logger.info("已删除 Chroma collection: %s", collection_name)
+    except Exception as exc:
+        logger.warning("删除 Chroma collection %s 失败: %s", collection_name, exc)

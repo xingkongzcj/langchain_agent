@@ -156,3 +156,13 @@ async def ingest_upload_file(
         # 清理临时文件
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+def list_documents(db: Session, course_id: int) -> list[DocumentModel]:
+    """获取课程下的文档列表。"""
+    return (
+        db.query(DocumentModel)
+        .filter(DocumentModel.course_id == course_id)
+        .order_by(DocumentModel.id.desc())
+        .all()
+    )
