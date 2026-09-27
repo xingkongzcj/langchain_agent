@@ -3,17 +3,18 @@
 import os
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from fastapi import UploadFile
 from langchain_community.document_loaders import (
     TextLoader,
     UnstructuredFileLoader,
-    UnstructuredMarkdownLoader,
     UnstructuredPDFLoader,
     UnstructuredWordDocumentLoader,
 )
 from langchain_core.document_loaders import BaseLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document as LangchainDocument
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
@@ -27,20 +28,92 @@ SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".md", ".txt"}
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
+# Markdown 标题切分规则
+MARKDOWN_HEADERS = [
+    ("#", "h1"),
+    ("##", "h2"),
+    ("###", "h3"),
+]
+
 
 def _select_loader(file_path: str) -> BaseLoader:
-    """根据文件扩展名选择合适的文档 Loader。"""
+    """根据文件扩展名选择合适的文档 Loader。
+
+    注意：Markdown 使用 TextLoader 保留原始 # 标题语法，
+    以便 MarkdownHeaderTextSplitter 正确识别章节层级。
+    """
     ext = Path(file_path).suffix.lower()
-    if ext == ".txt":
+    if ext in {".txt", ".md"}:
         return TextLoader(file_path, encoding="utf-8")
-    if ext == ".md":
-        return UnstructuredMarkdownLoader(file_path)
     if ext == ".pdf":
         return UnstructuredPDFLoader(file_path)
     if ext in {".docx", ".doc"}:
         return UnstructuredWordDocumentLoader(file_path)
     # 兜底：通用 Unstructured Loader
     return UnstructuredFileLoader(file_path)
+
+
+def _split_markdown(raw_docs: list[LangchainDocument]) -> list[LangchainDocument]:
+    """Markdown 两层切分：先按标题切，再按长度兜底切分。"""
+    header_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=MARKDOWN_HEADERS,
+        strip_headers=False,
+    )
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+    )
+
+    chunks: list[LangchainDocument] = []
+    for raw_doc in raw_docs:
+        # 第一层：按标题切分，块带 h1/h2/h3 metadata
+        header_splits = header_splitter.split_text(raw_doc.page_content)
+        # 第二层：对每个章节块按长度兜底切分（保留标题 metadata）
+        for header_split in header_splits:
+            chunks.extend(text_splitter.split_documents([header_split]))
+    return chunks
+
+
+def _split_generic(raw_docs: list[LangchainDocument]) -> list[LangchainDocument]:
+    """通用切分（PDF / Word / TXT）。"""
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+    )
+    return text_splitter.split_documents(raw_docs)
+
+
+def split_documents(
+    raw_docs: list[LangchainDocument],
+    file_type: str,
+) -> list[LangchainDocument]:
+    """按文件类型选择切分策略。"""
+    if file_type == "md":
+        return _split_markdown(raw_docs)
+    return _split_generic(raw_docs)
+
+
+def _build_metadata(
+    chunk: LangchainDocument,
+    index: int,
+    course_id: int,
+    document_id: int,
+    filename: str,
+) -> dict[str, Any]:
+    """构建单个 chunk 的 metadata（保留 source 与章节标题）。"""
+    meta: dict[str, Any] = {
+        "course_id": course_id,
+        "document_id": document_id,
+        "chunk_index": index,
+        "filename": filename,
+        "source": filename,
+    }
+    # 保留章节标题（仅 Markdown 文件有 h1/h2/h3）
+    for header_key in ("h1", "h2", "h3"):
+        value = chunk.metadata.get(header_key)
+        if value:
+            meta[header_key] = value
+    return meta
 
 
 def ingest_document(
@@ -81,12 +154,8 @@ def ingest_document(
         if not raw_docs:
             raise BusinessException(code=400, message="文档内容为空，无法入库")
 
-        # 3. 切分文档
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=CHUNK_SIZE,
-            chunk_overlap=CHUNK_OVERLAP,
-        )
-        chunks = splitter.split_documents(raw_docs)
+        # 3. 切分文档（Markdown 走两层切分，其余走通用切分）
+        chunks = split_documents(raw_docs, file_type)
         if not chunks:
             raise BusinessException(code=400, message="文档切分后无有效内容")
 
@@ -94,13 +163,8 @@ def ingest_document(
         vectorstore = get_vectorstore(f"course_{course_id}")
         texts = [chunk.page_content for chunk in chunks]
         metadatas = [
-            {
-                "course_id": course_id,
-                "document_id": doc.id,
-                "chunk_index": index,
-                "filename": filename,
-            }
-            for index, _chunk in enumerate(chunks)
+            _build_metadata(chunk, index, course_id, doc.id, filename)
+            for index, chunk in enumerate(chunks)
         ]
         vectorstore.add_texts(texts=texts, metadatas=metadatas)
 

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
     llm_model: str = Field(default="Qwen/Qwen2.5-7B-Instruct", description="大语言模型")
     embedding_model: str = Field(default="BAAI/bge-m3", description="Embedding 模型")
-    top_k: int = Field(default=4, description="检索召回数量")
+    top_k: int = Field(default=10, description="检索召回数量")
 
     # ============ MySQL 业务数据库 ============
     mysql_host: str = Field(default="localhost", description="MySQL 主机")

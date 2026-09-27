@@ -11,6 +11,9 @@ from app.db.chroma import get_vectorstore
 from app.prompts.templates import build_rag_messages
 from app.schemas.chat import ChatResponse, Source
 
+# bge-m3 官方查询前缀（检索前增强 query 表示）
+BGE_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章："
+
 
 @lru_cache
 def _get_chat_model() -> BaseChatModel:
@@ -37,9 +40,11 @@ def chat_with_knowledge(
     :return: 回答与引用来源
     """
     # 1. 检索（collection 按课程隔离 + metadata 双重过滤，防止跨课程串台）
+    # bge-m3 官方建议：检索前给查询加前缀，提升 query 表示质量
     vectorstore = get_vectorstore(f"course_{course_id}")
+    query_with_prefix = f"{BGE_QUERY_PREFIX}{question}"
     docs = vectorstore.similarity_search(
-        question,
+        query_with_prefix,
         k=settings.top_k,
         filter={"course_id": course_id},  # type: ignore[arg-type]
     )
