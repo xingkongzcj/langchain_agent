@@ -2,9 +2,12 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.core.exceptions import register_exception_handlers
@@ -20,6 +23,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# 前端静态资源目录
+STATIC_DIR = Path(__file__).parent.parent / "static"
 
 
 @asynccontextmanager
@@ -54,19 +60,18 @@ app.include_router(courses.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 
+# 挂载前端静态资源
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 # 启动信息（不打印密钥）
 logger.info("LLM 模型: %s", settings.llm_model)
 logger.info("Embedding 模型: %s", settings.embedding_model)
 
 
 @app.get("/")
-def root() -> dict:
-    """根路径。"""
-    return {
-        "message": "欢迎使用智学助手",
-        "docs": "/docs",
-        "redoc": "/redoc",
-    }
+def root() -> FileResponse:
+    """根路径：返回前端页面。"""
+    return FileResponse(str(STATIC_DIR / "index.html"))
 
 
 @app.get("/api/health")

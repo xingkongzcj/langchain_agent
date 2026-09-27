@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智学助手</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- 左侧侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">智学助手</h1>
+                <p class="subtitle">课程知识库问答与出题智能体</p>
+                <button id="btn-new-course" class="btn btn-primary">＋ 新建课程</button>
+            </div>
+            <ul id="course-list" class="course-list">
+                <li class="course-empty">暂无课程，点击上方按钮新建</li>
+            </ul>
+        </aside>
+
+        <!-- 右侧主内容区 -->
+        <main class="main">
+            <div class="tabs">
+                <button class="tab active" data-tab="documents">文档管理</button>
+                <button class="tab" data-tab="chat">智能问答</button>
+            </div>
+
+            <section id="tab-documents" class="tab-panel active">
+                <h2>文档管理</h2>
+                <p class="placeholder">当前课程：<span id="current-course-name">未选择</span></p>
+                <p class="placeholder">文档上传与列表功能开发中…</p>
+            </section>
+
+            <section id="tab-chat" class="tab-panel">
+                <h2>智能问答</h2>
+                <p class="placeholder">基于课程知识库的 RAG 问答功能开发中…</p>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
