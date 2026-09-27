@@ -28,9 +28,18 @@
             </div>
 
             <section id="tab-documents" class="tab-panel active">
-                <h2>文档管理</h2>
-                <p class="placeholder">当前课程：<span id="current-course-name">未选择</span></p>
-                <p class="placeholder">文档上传与列表功能开发中…</p>
+                <div class="panel-header">
+                    <h2>文档管理</h2>
+                    <span class="current-course">当前课程：<strong id="current-course-name">未选择</strong></span>
+                </div>
+                <div class="panel-toolbar">
+                    <button id="btn-upload" class="btn btn-primary btn-sm">上传文档</button>
+                    <input type="file" id="file-input" accept=".pdf,.docx,.doc,.md,.txt" hidden>
+                </div>
+                <div id="upload-status" class="upload-status" hidden></div>
+                <ul id="document-list" class="document-list">
+                    <li class="doc-empty">请先在左侧选择课程</li>
+                </ul>
             </section>
 
             <section id="tab-chat" class="tab-panel">
@@ -38,6 +47,21 @@
                 <p class="placeholder">基于课程知识库的 RAG 问答功能开发中…</p>
             </section>
         </main>
+    </div>
+
+    <!-- 新建课程弹窗 -->
+    <div id="course-modal" class="modal-overlay" hidden>
+        <div class="modal">
+            <h3 class="modal-title">新建课程</h3>
+            <label class="modal-label" for="input-course-name">课程名称</label>
+            <input type="text" id="input-course-name" class="modal-input" placeholder="请输入课程名称">
+            <label class="modal-label" for="input-course-desc">课程描述（可选）</label>
+            <textarea id="input-course-desc" class="modal-input" rows="3" placeholder="请输入课程描述"></textarea>
+            <div class="modal-actions">
+                <button id="btn-modal-cancel" class="btn btn-secondary">取消</button>
+                <button id="btn-modal-confirm" class="btn btn-primary">确定</button>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/api.js"></script>

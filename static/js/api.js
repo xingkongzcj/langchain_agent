@@ -52,4 +52,10 @@ const api = {
     del(path) {
         return request(path, { method: "DELETE" });
     },
+    upload(path, file) {
+        // multipart/form-data：不手动设置 Content-Type，由浏览器自动生成 boundary
+        const formData = new FormData();
+        formData.append("file", file);
+        return request(path, { method: "POST", body: formData });
+    },
 };
