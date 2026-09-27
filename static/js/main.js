@@ -1,11 +1,13 @@
 // 页面主逻辑
 
 let currentCourse = null; // 当前选中的课程 { id, name }
+let isThinking = false; // 是否正在等待 AI 回答
 
 document.addEventListener("DOMContentLoaded", () => {
     initTabs();
     initCourseModal();
     initUpload();
+    initChat();
     loadCourses();
 });
 
@@ -105,6 +107,115 @@ async function uploadDocument(file) {
     }
 }
 
+// 智能问答
+function initChat() {
+    const sendBtn = document.getElementById("btn-send");
+    const input = document.getElementById("chat-input");
+
+    sendBtn.addEventListener("click", () => sendMessage());
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendMessage();
+    });
+}
+
+async function sendMessage() {
+    if (isThinking) return;
+
+    const input = document.getElementById("chat-input");
+    const question = input.value.trim();
+    if (!question) return;
+    if (!currentCourse) {
+        alert("请先在左侧选择课程");
+        return;
+    }
+
+    // 1. 用户消息立即上屏
+    appendMessage("user", question);
+    input.value = "";
+
+    // 2. 显示"AI 思考中"加载
+    isThinking = true;
+    const thinkingEl = appendThinking();
+
+    try {
+        // 3. 调用后端 RAG 问答
+        const result = await api.post(`/courses/${currentCourse.id}/chat`, {
+            question,
+            session_id: null,
+        });
+        thinkingEl.remove();
+        // 4. 显示回答与引用来源
+        appendMessage("assistant", result.answer, result.sources);
+    } catch (err) {
+        thinkingEl.remove();
+        // 5. 错误提示：知识库为空等业务错误
+        const msg = err && err.code === 400 ? "请先上传文档" : "请求失败，请稍后重试";
+        appendMessage("assistant", msg);
+    } finally {
+        isThinking = false;
+    }
+}
+
+// 追加思考中气泡
+function appendThinking() {
+    const container = document.getElementById("chat-messages");
+    clearHint(container);
+
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message assistant";
+    msgDiv.innerHTML = '<div class="bubble thinking">AI 思考中…</div>';
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+    return msgDiv;
+}
+
+// 追加一条消息
+function appendMessage(role, content, sources = null) {
+    const container = document.getElementById("chat-messages");
+    clearHint(container);
+
+    const msgDiv = document.createElement("div");
+    msgDiv.className = `message ${role}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = content;
+    msgDiv.appendChild(bubble);
+
+    // 引用来源（浅灰色卡片）
+    if (sources && sources.length > 0) {
+        const sourcesDiv = document.createElement("div");
+        sourcesDiv.className = "sources";
+        sources.forEach((s) => {
+            const card = document.createElement("div");
+            card.className = "source-card";
+
+            const name = document.createElement("div");
+            name.className = "source-name";
+            name.textContent = s.filename || "未知来源";
+
+            const text = document.createElement("div");
+            text.className = "source-text";
+            text.textContent = (s.text || "").slice(0, 50) + "...";
+
+            card.appendChild(name);
+            card.appendChild(text);
+            sourcesDiv.appendChild(card);
+        });
+        msgDiv.appendChild(sourcesDiv);
+    }
+
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
+    return msgDiv;
+}
+
+// 清除初始提示
+function clearHint(container) {
+    const hint = container.querySelector(".chat-hint");
+    if (hint) hint.remove();
+}
+
 // 加载课程列表
 async function loadCourses() {
     const list = document.getElementById("course-list");
@@ -137,6 +248,14 @@ function selectCourse(course, li) {
     currentCourse = { id: course.id, name: course.name };
     document.getElementById("current-course-name").textContent = course.name;
     loadDocuments(course.id);
+    resetChat();
+}
+
+// 切换课程时清空聊天区
+function resetChat() {
+    const container = document.getElementById("chat-messages");
+    container.innerHTML =
+        '<div class="chat-hint">当前课程「' + escapeHtml(currentCourse.name) + '」，请在下方提问</div>';
 }
 
 // 加载文档列表
