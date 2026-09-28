@@ -1,8 +1,13 @@
 """验证 Chroma 本地向量写入与检索。
 
 运行前请确保 .env 中已配置有效的 SILICONFLOW_API_KEY。
-用法：python test_chroma.py
+用法：python tests/test_chroma.py
 """
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings
 from app.db.chroma import get_vectorstore

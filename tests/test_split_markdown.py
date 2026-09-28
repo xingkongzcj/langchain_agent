@@ -1,22 +1,29 @@
 """验证 Markdown 两层切分效果。
 
-用法：python test_split_markdown.py
+用法：python tests/test_split_markdown.py
 
-读取项目根目录的 test_knowledge.md，打印 chunk 总数，
+读取 tests/data/test_knowledge.md，打印 chunk 总数，
 以及每个 chunk 的前 50 字 + metadata 中的 h1/h2。
 """
 
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from langchain_community.document_loaders import TextLoader
 
 from app.services.document_service import split_documents
 
+# 测试数据目录（tests/data）
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
 
 def main() -> None:
-    file_path = "test_knowledge.md"
+    file_path = str(DATA_DIR / "test_knowledge.md")
     if not os.path.exists(file_path):
-        print(f"[错误] 未找到 {file_path}，请先在项目根目录准备该文件。")
+        print(f"[错误] 未找到 {file_path}，请确认测试数据文件存在。")
         return
 
     # 读取原始 Markdown（保留 # 标题语法）

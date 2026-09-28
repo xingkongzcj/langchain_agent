@@ -5,8 +5,13 @@
 2. .env 已配置有效的 SILICONFLOW_API_KEY
 3. 已创建课程并上传过文档（知识库非空）
 
-用法：python test_quiz.py
+用法：python tests/test_quiz.py
 """
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings
 from app.db.mysql import SessionLocal, init_db

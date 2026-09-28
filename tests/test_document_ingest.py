@@ -4,10 +4,14 @@
 1. MySQL 已启动：docker-compose up -d
 2. .env 已配置有效的 SILICONFLOW_API_KEY
 
-用法：python test_document_ingest.py
+用法：python tests/test_document_ingest.py
 """
 
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings
 from app.db.mysql import SessionLocal, init_db

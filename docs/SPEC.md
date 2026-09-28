@@ -318,6 +318,14 @@ langchain_agent/
 │       ├── quiz.js
 │       ├── mistake.js
 │       └── review.js
+├── tests/                       # 测试脚本与测试数据
+│   ├── test_chroma.py           # 验证 Chroma 写入与检索
+│   ├── test_document_ingest.py  # 验证文档入库
+│   ├── test_quiz.py             # 验证自动出题
+│   ├── test_split_markdown.py   # 验证 Markdown 两层切分
+│   └── data/                    # 测试数据文件
+│       ├── test_knowledge.md
+│       └── java_learning.md
 ├── docs/
 │   ├── PRD.md
 │   ├── SPEC.md
@@ -327,6 +335,7 @@ langchain_agent/
 ├── .env                         # git 忽略
 ├── .gitignore
 ├── requirements.txt
+├── pytest.ini                  # pytest 配置
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md

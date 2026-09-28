@@ -8,6 +8,7 @@ venv/
 # Python缓存
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # PyCharm 配置
 .idea/
