@@ -492,14 +492,71 @@ async function loadCourses() {
         courses.forEach((course) => {
             const li = document.createElement("li");
             li.className = "course-item";
-            li.textContent = course.name;
             li.dataset.id = course.id;
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "course-name";
+            nameSpan.textContent = course.name;
+
+            const delBtn = document.createElement("button");
+            delBtn.className = "course-delete";
+            delBtn.textContent = "×";
+            delBtn.title = "删除课程";
+            delBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                deleteCourse(course);
+            });
+
+            li.appendChild(nameSpan);
+            li.appendChild(delBtn);
             li.addEventListener("click", () => selectCourse(course, li));
             list.appendChild(li);
         });
     } catch (err) {
         // 错误已在 api.js 中提示
     }
+}
+
+async function deleteCourse(course) {
+    const confirmed = confirm(
+        `确定删除课程【${course.name}】吗？该课程下的文档、题目、错题和复习计划将一并删除。`
+    );
+    if (!confirmed) return;
+
+    try {
+        await api.del(`/courses/${course.id}`);
+
+        // 如果删除的是当前选中课程，清空右侧内容区
+        if (currentCourse && currentCourse.id === course.id) {
+            currentCourse = null;
+            clearMainContent();
+        }
+
+        await loadCourses();
+        alert("课程删除成功");
+    } catch (err) {
+        // 错误已在 api.js 中提示
+    }
+}
+
+function clearMainContent() {
+    document.getElementById("current-course-name").textContent = "未选择";
+    document.getElementById("quiz-current-course").textContent = "未选择";
+    document.getElementById("mistake-current-course").textContent = "未选择";
+    document.getElementById("review-current-course").textContent = "未选择";
+
+    document.getElementById("document-list").innerHTML =
+        '<li class="doc-empty">请先在左侧选择课程</li>';
+    document.getElementById("chat-messages").innerHTML =
+        '<div class="chat-hint">请先在左侧选择课程，然后在下方输入问题</div>';
+    document.getElementById("quiz-list").innerHTML =
+        '<div class="quiz-empty">请先在左侧选择课程，再生成题目</div>';
+    document.getElementById("quiz-status").hidden = true;
+    document.getElementById("mistake-list").innerHTML =
+        '<div class="quiz-empty">请先在左侧选择课程</div>';
+    document.getElementById("review-list").innerHTML =
+        '<div class="quiz-empty">请先在左侧选择课程，再生成复习计划</div>';
+    document.getElementById("review-status").hidden = true;
 }
 
 function selectCourse(course, li) {
