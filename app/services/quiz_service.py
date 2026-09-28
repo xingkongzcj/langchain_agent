@@ -123,3 +123,11 @@ def _strip_markdown_fence(text: str) -> str:
             text = text[4:]
         text = text.strip()
     return text
+
+
+def list_questions(db: Session, course_id: int, batch_id: int | None = None) -> list[Question]:
+    """获取课程下的题目列表，可按批次筛选。"""
+    query = db.query(Question).filter(Question.course_id == course_id)
+    if batch_id is not None:
+        query = query.filter(Question.batch_id == batch_id)
+    return query.order_by(Question.id.asc()).all()

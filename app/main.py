@@ -14,7 +14,7 @@ from app.core.exceptions import register_exception_handlers
 from app.core.response import ApiResponse
 from app.db.chroma import check_chroma
 from app.db.mysql import check_mysql, init_db
-from app.routers import chat, courses, documents
+from app.routers import chat, courses, documents, quiz
 from app.schemas.health import HealthData
 
 # 配置日志
@@ -59,6 +59,7 @@ app.add_middleware(
 app.include_router(courses.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(quiz.router)
 
 # 挂载前端静态资源
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
