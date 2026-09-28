@@ -76,3 +76,33 @@ def build_quiz_messages(
         {"role": "system", "content": QUIZ_GENERATION_PROMPT},
         {"role": "user", "content": user_content},
     ]
+
+
+SHORT_ANSWER_GRADING_PROMPT = """你是"智学助手"的简答题批改引擎，请根据【参考答案】对用户的作答进行语义评分。
+
+评分要求：
+1. 只要用户作答的核心意思与参考答案一致（不要求逐字一致），即判为正确；
+2. score 为 0-100 的整数，表示作答与参考答案的匹配程度；
+3. reason 为简短的批改理由（一句话即可）。
+
+输出要求（极其重要）：
+仅返回纯 JSON，不要包含任何 markdown 标记或额外解释。格式如下：
+{"correct": true, "score": 80, "reason": "..."}"""
+
+
+def build_grading_messages(reference_answer: str, user_answer: str) -> list[dict[str, str]]:
+    """构建简答题批改的消息列表。
+
+    :param reference_answer: 参考答案
+    :param user_answer: 用户作答
+    :return: 消息列表（system + user）
+    """
+    user_content = (
+        f"【参考答案】\n{reference_answer}\n\n"
+        f"【用户作答】\n{user_answer}\n\n"
+        "请对用户作答进行评分，并返回 JSON。"
+    )
+    return [
+        {"role": "system", "content": SHORT_ANSWER_GRADING_PROMPT},
+        {"role": "user", "content": user_content},
+    ]
