@@ -637,3 +637,59 @@ body {
     background-color: #f9fafb;
     color: #9ca3af;
 }
+
+/* ============ 复习计划 ============ */
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.review-plan-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.review-group {
+    background-color: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.review-date {
+    font-weight: 600;
+    color: #4f7cff;
+    margin-bottom: 12px;
+    font-size: 15px;
+}
+
+.review-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.review-item:last-child {
+    border-bottom: none;
+}
+
+.review-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.review-knowledge {
+    font-size: 14px;
+    color: #333;
+}
+
+.review-knowledge.done {
+    color: #9ca3af;
+    text-decoration: line-through;
+}

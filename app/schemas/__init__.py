@@ -12,7 +12,12 @@ from app.schemas.mistake import (
     SubmitAnswerResponse,
 )
 from app.schemas.quiz import QuestionOut, QuizBatchOut, QuizGenerateRequest
-from app.schemas.review import ReviewItemOut, ReviewPlanCreate, ReviewPlanOut
+from app.schemas.review import (
+    ReviewItemOut,
+    ReviewItemUpdate,
+    ReviewPlanCreate,
+    ReviewPlanOut,
+)
 
 __all__ = [
     "ChatRequest",
@@ -31,6 +36,7 @@ __all__ = [
     "QuizBatchOut",
     "QuizGenerateRequest",
     "ReviewItemOut",
+    "ReviewItemUpdate",
     "ReviewPlanCreate",
     "ReviewPlanOut",
     "Source",

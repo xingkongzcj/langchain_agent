@@ -106,3 +106,34 @@ def build_grading_messages(reference_answer: str, user_answer: str) -> list[dict
         {"role": "system", "content": SHORT_ANSWER_GRADING_PROMPT},
         {"role": "user", "content": user_content},
     ]
+
+
+REVIEW_PLAN_PROMPT = """你是"智学助手"的复习计划引擎，请根据提供的【错题列表】制定一个 7 天复习计划。
+
+要求：
+1. 将错题涉及的知识点合理分配到 7 天内（第 1 天到第 7 天）；
+2. 每个知识点只出现一次，不要重复；
+3. 每天至少安排一个知识点（错题较少时可不连续安排）；
+4. knowledge_point 为简洁的知识点描述（一句话即可）。
+
+输出要求（极其重要）：
+仅返回纯 JSON，不要包含任何 markdown 标记或额外解释。格式如下：
+{"plan_name": "复习计划", "items": [{"day": 1, "knowledge_point": "RAG 的核心逻辑"}]}
+
+注意：day 字段必须是 1-7 的整数，表示第几天；不要计算具体日期。"""
+
+
+def build_review_plan_messages(mistakes_text: str) -> list[dict[str, str]]:
+    """构建复习计划生成的消息列表。
+
+    :param mistakes_text: 错题拼接文本
+    :return: 消息列表（system + user）
+    """
+    user_content = (
+        f"【错题列表】\n{mistakes_text}\n\n"
+        "请根据以上错题制定 7 天复习计划，并返回 JSON。"
+    )
+    return [
+        {"role": "system", "content": REVIEW_PLAN_PROMPT},
+        {"role": "user", "content": user_content},
+    ]

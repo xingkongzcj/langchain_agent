@@ -11,6 +11,12 @@ class ReviewPlanCreate(BaseModel):
     name: str | None = Field(default=None, description="计划名称")
 
 
+class ReviewItemUpdate(BaseModel):
+    """更新复习条目请求。"""
+
+    completed: bool = Field(..., description="是否完成")
+
+
 class ReviewItemOut(BaseModel):
     """复习条目响应。"""
 

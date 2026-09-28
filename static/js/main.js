@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initUpload();
     initChat();
     initQuiz();
+    initReview();
     loadCourses();
 });
 
@@ -510,10 +511,13 @@ function selectCourse(course, li) {
     document.getElementById("current-course-name").textContent = course.name;
     document.getElementById("quiz-current-course").textContent = course.name;
     document.getElementById("mistake-current-course").textContent = course.name;
+    document.getElementById("review-current-course").textContent = course.name;
     loadDocuments(course.id);
     resetChat();
     resetQuiz();
     loadMistakes(course.id);
+    resetReview();
+    loadReviewPlans(course.id);
 }
 
 function resetChat() {
@@ -550,6 +554,130 @@ async function loadDocuments(courseId) {
     } catch (err) {
         // 错误已在 api.js 中提示
     }
+}
+
+// ============ 复习计划 ============
+function initReview() {
+    const btn = document.getElementById("btn-generate-plan");
+    btn.addEventListener("click", () => generatePlan());
+}
+
+async function generatePlan() {
+    if (!currentCourse) {
+        alert("请先在左侧选择课程");
+        return;
+    }
+
+    const status = document.getElementById("review-status");
+    status.hidden = false;
+    status.className = "upload-status loading";
+    status.textContent = "AI 生成复习计划中…，请稍候";
+
+    try {
+        await api.post(`/courses/${currentCourse.id}/review-plans`, { name: null });
+        status.hidden = true;
+        await loadReviewPlans(currentCourse.id);
+    } catch (err) {
+        status.className = "upload-status error";
+        status.textContent = "生成失败，请重试";
+    }
+}
+
+async function loadReviewPlans(courseId) {
+    const list = document.getElementById("review-list");
+    try {
+        const plans = await api.get(`/courses/${courseId}/review-plans`);
+        list.innerHTML = "";
+        if (!plans || plans.length === 0) {
+            list.innerHTML = '<div class="quiz-empty">暂无复习计划，点击上方按钮生成</div>';
+            return;
+        }
+        const detail = await api.get(`/review-plans/${plans[0].id}`);
+        renderReviewPlan(detail);
+    } catch (err) {
+        // 错误已在 api.js 中提示
+    }
+}
+
+function renderReviewPlan(plan) {
+    const list = document.getElementById("review-list");
+    list.innerHTML = "";
+
+    const title = document.createElement("div");
+    title.className = "review-plan-title";
+    title.textContent = plan.name;
+    list.appendChild(title);
+
+    if (!plan.items || plan.items.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "quiz-empty";
+        empty.textContent = "计划中暂无复习条目";
+        list.appendChild(empty);
+        return;
+    }
+
+    // 按日期分组
+    const groups = {};
+    plan.items.forEach((item) => {
+        const key = item.review_date;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+    });
+
+    Object.keys(groups).sort().forEach((dateKey) => {
+        const group = document.createElement("div");
+        group.className = "review-group";
+
+        const dateEl = document.createElement("div");
+        dateEl.className = "review-date";
+        dateEl.textContent = dateKey;
+        group.appendChild(dateEl);
+
+        groups[dateKey].forEach((item) => {
+            group.appendChild(createReviewItem(item));
+        });
+
+        list.appendChild(group);
+    });
+}
+
+function createReviewItem(item) {
+    const el = document.createElement("div");
+    el.className = "review-item";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = item.completed;
+    checkbox.addEventListener("change", () => toggleReviewItem(item.id, checkbox, el));
+
+    const label = document.createElement("span");
+    label.className = "review-knowledge";
+    label.textContent = item.knowledge_point || "（无知识点）";
+    if (item.completed) label.classList.add("done");
+
+    el.appendChild(checkbox);
+    el.appendChild(label);
+    return el;
+}
+
+async function toggleReviewItem(itemId, checkbox, el) {
+    try {
+        await api.patch(`/review-items/${itemId}`, { completed: checkbox.checked });
+        const label = el.querySelector(".review-knowledge");
+        if (checkbox.checked) {
+            label.classList.add("done");
+        } else {
+            label.classList.remove("done");
+        }
+    } catch (err) {
+        checkbox.checked = !checkbox.checked; // 失败回滚
+    }
+}
+
+function resetReview() {
+    document.getElementById("review-list").innerHTML =
+        '<div class="quiz-empty">请先在左侧选择课程，再生成复习计划</div>';
+    document.getElementById("review-status").hidden = true;
 }
 
 // 简单的 HTML 转义，防止 XSS

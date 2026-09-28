@@ -27,6 +27,7 @@
                 <button class="tab" data-tab="chat">智能问答</button>
                 <button class="tab" data-tab="quiz">自动出题</button>
                 <button class="tab" data-tab="mistakes">错题本</button>
+                <button class="tab" data-tab="review">复习计划</button>
             </div>
 
             <section id="tab-documents" class="tab-panel active">
@@ -109,6 +110,20 @@
                 </div>
                 <div id="mistake-list" class="mistake-list">
                     <div class="quiz-empty">请先在左侧选择课程</div>
+                </div>
+            </section>
+
+            <section id="tab-review" class="tab-panel">
+                <div class="panel-header">
+                    <h2>复习计划</h2>
+                    <span class="current-course">当前课程：<strong id="review-current-course">未选择</strong></span>
+                </div>
+                <div class="panel-toolbar">
+                    <button id="btn-generate-plan" class="btn btn-primary btn-sm">生成复习计划</button>
+                </div>
+                <div id="review-status" class="upload-status" hidden></div>
+                <div id="review-list" class="review-list">
+                    <div class="quiz-empty">请先在左侧选择课程，再生成复习计划</div>
                 </div>
             </section>
         </main>
