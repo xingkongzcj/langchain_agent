@@ -60,10 +60,14 @@ langchain_agent/
 │   ├── services/            # 业务逻辑层
 │   └── prompts/             # Prompt 模板
 ├── static/                  # 前端静态资源（HTML/CSS/JS）
+├── tests/                   # 测试脚本与测试数据
+│   ├── test_*.py            # 功能验证脚本（Chroma/入库/出题/切分）
+│   └── data/                # 测试数据文件（.md）
 ├── docs/                    # PRD / SPEC / AGENTS 规范文档
 ├── .env                     # 环境变量（不提交）
 ├── .env.example             # 环境变量样例
 ├── requirements.txt
+├── pytest.ini               # pytest 配置
 ├── docker-compose.yml       # MySQL 容器编排
 └── README.md
 ```
@@ -115,6 +119,19 @@ uvicorn app.main:app --reload --port 8000
 | http://127.0.0.1:8000 | 前端页面 |
 | http://127.0.0.1:8000/docs | Swagger API 文档 |
 | http://127.0.0.1:8000/api/health | 健康检查（MySQL / Chroma 连通性） |
+
+### 6. 运行测试
+
+```bash
+# 方式一：pytest（验证 import 与测试收集）
+.venv\Scripts\python.exe -m pytest -v
+
+# 方式二：直接运行测试脚本（功能验证，测试数据在 tests/data/）
+.venv\Scripts\python.exe tests\test_split_markdown.py    # 纯本地，验证 Markdown 两层切分
+.venv\Scripts\python.exe tests\test_chroma.py            # 需要 SILICONFLOW_API_KEY
+.venv\Scripts\python.exe tests\test_document_ingest.py   # 需要 API Key + MySQL
+.venv\Scripts\python.exe tests\test_quiz.py              # 需要 API Key + MySQL + 已有文档课程
+```
 
 ## 核心功能
 
