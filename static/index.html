@@ -26,6 +26,7 @@
                 <button class="tab active" data-tab="documents">文档管理</button>
                 <button class="tab" data-tab="chat">智能问答</button>
                 <button class="tab" data-tab="quiz">自动出题</button>
+                <button class="tab" data-tab="mistakes">错题本</button>
             </div>
 
             <section id="tab-documents" class="tab-panel active">
@@ -98,6 +99,16 @@
                 <div id="quiz-status" class="upload-status" hidden></div>
                 <div id="quiz-list" class="quiz-list">
                     <div class="quiz-empty">请先在左侧选择课程，再生成题目</div>
+                </div>
+            </section>
+
+            <section id="tab-mistakes" class="tab-panel">
+                <div class="panel-header">
+                    <h2>错题本</h2>
+                    <span class="current-course">当前课程：<strong id="mistake-current-course">未选择</strong></span>
+                </div>
+                <div id="mistake-list" class="mistake-list">
+                    <div class="quiz-empty">请先在左侧选择课程</div>
                 </div>
             </section>
         </main>

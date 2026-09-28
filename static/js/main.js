@@ -47,7 +47,6 @@ function initCourseModal() {
         modal.hidden = true;
     });
 
-    // 点击遮罩关闭
     modal.addEventListener("click", (e) => {
         if (e.target === modal) modal.hidden = true;
     });
@@ -86,11 +85,10 @@ function initUpload() {
         const file = fileInput.files[0];
         if (!file) return;
         await uploadDocument(file);
-        fileInput.value = ""; // 允许重复选择同一文件
+        fileInput.value = "";
     });
 }
 
-// 上传文档
 async function uploadDocument(file) {
     const status = document.getElementById("upload-status");
     status.hidden = false;
@@ -108,7 +106,7 @@ async function uploadDocument(file) {
     }
 }
 
-// 智能问答
+// ============ 智能问答 ============
 function initChat() {
     const sendBtn = document.getElementById("btn-send");
     const input = document.getElementById("chat-input");
@@ -152,7 +150,6 @@ async function sendMessage() {
     }
 }
 
-// 追加思考中气泡
 function appendThinking() {
     const container = document.getElementById("chat-messages");
     clearHint(container);
@@ -165,7 +162,6 @@ function appendThinking() {
     return msgDiv;
 }
 
-// 追加一条消息
 function appendMessage(role, content, sources = null) {
     const container = document.getElementById("chat-messages");
     clearHint(container);
@@ -205,7 +201,6 @@ function appendMessage(role, content, sources = null) {
     return msgDiv;
 }
 
-// 清除初始提示
 function clearHint(container) {
     const hint = container.querySelector(".chat-hint");
     if (hint) hint.remove();
@@ -264,6 +259,7 @@ function renderQuiz(questions) {
 function createQuizCard(q, index) {
     const card = document.createElement("div");
     card.className = "quiz-card";
+    card.dataset.answered = "0";
 
     // 题目
     const questionEl = document.createElement("div");
@@ -271,8 +267,14 @@ function createQuizCard(q, index) {
     questionEl.textContent = `${index + 1}. ${q.question}`;
     card.appendChild(questionEl);
 
-    if (q.type !== "short") {
-        // 客观题：选项列表（简答题主区域仅显示题干）
+    if (q.type === "short") {
+        // 简答题：渲染输入框
+        const textarea = document.createElement("textarea");
+        textarea.className = "quiz-textarea";
+        textarea.placeholder = "请输入你的答案…";
+        card.appendChild(textarea);
+    } else {
+        // 客观题：选项列表
         const optionsEl = document.createElement("div");
         optionsEl.className = "quiz-options";
         (q.options || []).forEach((opt, i) => {
@@ -280,28 +282,30 @@ function createQuizCard(q, index) {
             optEl.className = "quiz-option";
             optEl.textContent = opt;
             optEl.dataset.index = String(i);
-            optEl.addEventListener("click", () => handleOptionClick(q, card, optEl, i));
+            optEl.addEventListener("click", () => handleOptionSelect(q, card, optEl));
             optionsEl.appendChild(optEl);
         });
         card.appendChild(optionsEl);
     }
 
-    // 查看解析（默认折叠）
+    // 操作区：提交答案 + 查看解析
     const actionsEl = document.createElement("div");
     actionsEl.className = "quiz-actions";
+    const submitBtn = document.createElement("button");
+    submitBtn.className = "btn btn-primary btn-sm";
+    submitBtn.textContent = "提交答案";
+    submitBtn.addEventListener("click", () => submitQuizAnswer(q, card, submitBtn));
+    actionsEl.appendChild(submitBtn);
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "btn btn-secondary btn-sm";
     toggleBtn.textContent = "查看解析";
     actionsEl.appendChild(toggleBtn);
     card.appendChild(actionsEl);
 
+    // 解析区（默认折叠，提交答案后填充）
     const answerEl = document.createElement("div");
     answerEl.className = "quiz-answer";
     answerEl.hidden = true;
-    const answerLabel = q.type === "short" ? "参考答案：" : "答案：";
-    answerEl.innerHTML =
-        '<div class="answer-line"><strong>' + answerLabel + '</strong>' + escapeHtml(q.answer || "无") + "</div>" +
-        '<div class="explanation-line"><strong>解析：</strong>' + escapeHtml(q.explanation || "无") + "</div>";
     card.appendChild(answerEl);
 
     toggleBtn.addEventListener("click", () => {
@@ -312,75 +316,169 @@ function createQuizCard(q, index) {
     return card;
 }
 
-function handleOptionClick(q, card, optEl, index) {
-    const type = q.type;
-
-    if (type === "multiple") {
-        // 多选：toggle 选中，等待提交
+function handleOptionSelect(q, card, optEl) {
+    if (card.dataset.answered === "1") return;
+    if (q.type === "multiple") {
         optEl.classList.toggle("selected");
-        ensureSubmitButton(q, card);
-        return;
+    } else {
+        card.querySelectorAll(".quiz-option").forEach((o) => o.classList.remove("selected"));
+        optEl.classList.add("selected");
+    }
+}
+
+async function submitQuizAnswer(q, card, submitBtn) {
+    const textarea = q.type === "short" ? card.querySelector(".quiz-textarea") : null;
+
+    let userAnswer;
+    if (q.type === "short") {
+        userAnswer = textarea.value.trim();
+        if (!userAnswer) {
+            alert("请先输入答案");
+            return;
+        }
+    } else {
+        userAnswer = collectUserAnswer(q, card);
+        if (!userAnswer) {
+            alert("请先选择答案");
+            return;
+        }
     }
 
-    // 单选 / 判断：点击即判
-    if (card.dataset.answered) return;
-    card.dataset.answered = "1";
+    submitBtn.disabled = true;
+    try {
+        const result = await api.post(`/questions/${q.id}/submit`, {
+            user_answer: userAnswer,
+        });
+        card.dataset.answered = "1";
 
+        const answerEl = card.querySelector(".quiz-answer");
+        answerEl.hidden = false;
+
+        if (q.type === "short") {
+            // 简答题：禁用输入框，展示 AI 评分 + 批改理由 + 参考答案 + 解析
+            if (textarea) textarea.disabled = true;
+            answerEl.innerHTML =
+                '<div class="answer-line"><strong>AI 评分：</strong>' + (result.score != null ? result.score + "分" : "无") + "</div>" +
+                '<div class="explanation-line"><strong>批改理由：</strong>' + escapeHtml(result.reason || "无") + "</div>" +
+                '<div class="answer-line"><strong>参考答案：</strong>' + escapeHtml(result.correct_answer || "无") + "</div>" +
+                '<div class="explanation-line"><strong>解析：</strong>' + escapeHtml(result.explanation || "无") + "</div>";
+        } else {
+            // 客观题：标对错 + 答案 + 解析
+            markOptions(q, card, result.correct, result.correct_answer);
+            answerEl.innerHTML =
+                '<div class="answer-line"><strong>答案：</strong>' + escapeHtml(result.correct_answer || "无") + "</div>" +
+                '<div class="explanation-line"><strong>解析：</strong>' + escapeHtml(result.explanation || "无") + "</div>";
+        }
+
+        const toggleBtn = card.querySelector(".quiz-actions .btn-secondary");
+        if (toggleBtn) toggleBtn.textContent = "收起解析";
+
+        if (result.mistake_id) {
+            alert("已加入错题本");
+        }
+    } catch (err) {
+        // 错误已在 api.js 中提示
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+function collectUserAnswer(q, card) {
+    const selected = card.querySelectorAll(".quiz-option.selected");
+    if (selected.length === 0) return "";
+
+    if (q.type === "judge") {
+        return selected[0].textContent.trim();
+    }
+    if (q.type === "multiple") {
+        const letters = [];
+        selected.forEach((opt) => {
+            letters.push(q.options[parseInt(opt.dataset.index, 10)][0]);
+        });
+        return letters.sort().join("");
+    }
+    return q.options[parseInt(selected[0].dataset.index, 10)][0];
+}
+
+function markOptions(q, card, correct, correctAnswer) {
     const options = card.querySelectorAll(".quiz-option");
-    const correct =
-        type === "judge"
-            ? q.options[index] === q.answer
-            : q.options[index][0] === q.answer;
-
-    options.forEach((opt, i) => {
+    options.forEach((opt) => {
         opt.classList.add("disabled");
+        const i = parseInt(opt.dataset.index, 10);
         const isAnswer =
-            type === "judge"
-                ? q.options[i] === q.answer
-                : q.options[i][0] === q.answer;
+            q.type === "judge"
+                ? q.options[i] === correctAnswer
+                : (correctAnswer || "").includes(q.options[i][0]);
         if (isAnswer) opt.classList.add("correct");
-    });
-    optEl.classList.add(correct ? "correct" : "wrong");
-}
-
-function ensureSubmitButton(q, card) {
-    if (card.querySelector(".btn-submit")) return;
-    const actions = card.querySelector(".quiz-actions");
-    const submitBtn = document.createElement("button");
-    submitBtn.className = "btn btn-primary btn-sm btn-submit";
-    submitBtn.textContent = "提交答案";
-    submitBtn.addEventListener("click", () => handleMultipleSubmit(q, card));
-    actions.prepend(submitBtn);
-}
-
-function handleMultipleSubmit(q, card) {
-    if (card.dataset.answered) return;
-    card.dataset.answered = "1";
-
-    const selected = [];
-    card.querySelectorAll(".quiz-option.selected").forEach((opt) => {
-        selected.push(q.options[parseInt(opt.dataset.index, 10)][0]);
-    });
-    const userAnswer = selected.sort().join("");
-    const correctAnswer = (q.answer || "").split("").sort().join("");
-    const correct = userAnswer === correctAnswer;
-
-    card.querySelectorAll(".quiz-option").forEach((opt) => {
-        opt.classList.add("disabled");
-        const letter = q.options[parseInt(opt.dataset.index, 10)][0];
-        if ((q.answer || "").includes(letter)) opt.classList.add("correct");
     });
     if (!correct) {
         card.querySelectorAll(".quiz-option.selected").forEach((opt) => {
             opt.classList.add("wrong");
         });
     }
-
-    const submitBtn = card.querySelector(".btn-submit");
-    if (submitBtn) submitBtn.remove();
 }
 
-// 加载课程列表
+// ============ 错题本 ============
+async function loadMistakes(courseId) {
+    const list = document.getElementById("mistake-list");
+    try {
+        const items = await api.get(`/courses/${courseId}/mistakes`);
+        list.innerHTML = "";
+        if (!items || items.length === 0) {
+            list.innerHTML = '<div class="quiz-empty">暂无错题</div>';
+            return;
+        }
+        items.forEach((item) => {
+            list.appendChild(createMistakeCard(item));
+        });
+    } catch (err) {
+        // 错误已在 api.js 中提示
+    }
+}
+
+function createMistakeCard(item) {
+    const card = document.createElement("div");
+    card.className = "mistake-card";
+
+    const questionEl = document.createElement("div");
+    questionEl.className = "mistake-question";
+    questionEl.textContent = item.question;
+
+    const wrongEl = document.createElement("div");
+    wrongEl.className = "mistake-row wrong-answer";
+    wrongEl.textContent = "你的答案：" + (item.user_answer || "无");
+
+    const correctEl = document.createElement("div");
+    correctEl.className = "mistake-row correct-answer";
+    correctEl.textContent = "正确答案：" + (item.correct_answer || "无");
+
+    const explanationEl = document.createElement("div");
+    explanationEl.className = "mistake-row";
+    explanationEl.textContent = "解析：" + (item.explanation || "无");
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn-primary btn-sm";
+    btn.textContent = "标记已掌握";
+    btn.addEventListener("click", () => markMastered(item.id, card));
+
+    card.appendChild(questionEl);
+    card.appendChild(wrongEl);
+    card.appendChild(correctEl);
+    card.appendChild(explanationEl);
+    card.appendChild(btn);
+    return card;
+}
+
+async function markMastered(mistakeId, card) {
+    try {
+        await api.patch(`/mistakes/${mistakeId}`, { status: "mastered" });
+        card.remove();
+    } catch (err) {
+        // 错误已在 api.js 中提示
+    }
+}
+
+// ============ 课程与文档 ============
 async function loadCourses() {
     const list = document.getElementById("course-list");
     try {
@@ -403,7 +501,6 @@ async function loadCourses() {
     }
 }
 
-// 选中课程
 function selectCourse(course, li) {
     document.querySelectorAll(".course-item").forEach((item) => {
         item.classList.remove("active");
@@ -412,18 +509,25 @@ function selectCourse(course, li) {
     currentCourse = { id: course.id, name: course.name };
     document.getElementById("current-course-name").textContent = course.name;
     document.getElementById("quiz-current-course").textContent = course.name;
+    document.getElementById("mistake-current-course").textContent = course.name;
     loadDocuments(course.id);
     resetChat();
+    resetQuiz();
+    loadMistakes(course.id);
 }
 
-// 切换课程时清空聊天区
 function resetChat() {
     const container = document.getElementById("chat-messages");
     container.innerHTML =
         '<div class="chat-hint">当前课程「' + escapeHtml(currentCourse.name) + '」，请在下方提问</div>';
 }
 
-// 加载文档列表
+function resetQuiz() {
+    document.getElementById("quiz-list").innerHTML =
+        '<div class="quiz-empty">请先在左侧选择课程，再生成题目</div>';
+    document.getElementById("quiz-status").hidden = true;
+}
+
 async function loadDocuments(courseId) {
     const list = document.getElementById("document-list");
     try {

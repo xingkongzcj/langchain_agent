@@ -52,6 +52,13 @@ const api = {
     del(path) {
         return request(path, { method: "DELETE" });
     },
+    patch(path, data) {
+        return request(path, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+        });
+    },
     upload(path, file) {
         // multipart/form-data：不手动设置 Content-Type，由浏览器自动生成 boundary
         const formData = new FormData();

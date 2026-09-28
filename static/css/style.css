@@ -569,3 +569,71 @@ body {
 .explanation-line strong {
     color: #4f7cff;
 }
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ============ 错题本 ============ */
+.mistake-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.mistake-card {
+    background-color: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.mistake-question {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+
+.mistake-row {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 6px;
+    color: #4b5563;
+}
+
+.mistake-row.wrong-answer {
+    color: #dc2626;
+}
+
+.mistake-row.correct-answer {
+    color: #047857;
+}
+
+.mistake-card .btn {
+    margin-top: 12px;
+}
+
+/* ============ 简答题输入框 ============ */
+.quiz-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 16px;
+    resize: vertical;
+}
+
+.quiz-textarea:focus {
+    outline: none;
+    border-color: #4f7cff;
+}
+
+.quiz-textarea:disabled {
+    background-color: #f9fafb;
+    color: #9ca3af;
+}
