@@ -25,6 +25,7 @@
             <div class="tabs">
                 <button class="tab active" data-tab="documents">文档管理</button>
                 <button class="tab" data-tab="chat">智能问答</button>
+                <button class="tab" data-tab="quiz">自动出题</button>
             </div>
 
             <section id="tab-documents" class="tab-panel active">
@@ -51,6 +52,52 @@
                         <input type="text" id="chat-input" class="chat-input" placeholder="请输入你的问题，回车发送">
                         <button id="btn-send" class="btn btn-primary">发送</button>
                     </div>
+                </div>
+            </section>
+
+            <section id="tab-quiz" class="tab-panel">
+                <div class="panel-header">
+                    <h2>自动出题</h2>
+                    <span class="current-course">当前课程：<strong id="quiz-current-course">未选择</strong></span>
+                </div>
+                <div class="quiz-form">
+                    <div class="form-group">
+                        <label for="quiz-type">题型</label>
+                        <select id="quiz-type">
+                            <option value="single">单选</option>
+                            <option value="multiple">多选</option>
+                            <option value="judge">判断</option>
+                            <option value="short">简答</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quiz-difficulty">难度</label>
+                        <select id="quiz-difficulty">
+                            <option value="easy">易</option>
+                            <option value="medium" selected>中</option>
+                            <option value="hard">难</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quiz-count">数量</label>
+                        <select id="quiz-count">
+                            <option>1</option>
+                            <option>2</option>
+                            <option>3</option>
+                            <option>4</option>
+                            <option selected>5</option>
+                            <option>6</option>
+                            <option>7</option>
+                            <option>8</option>
+                            <option>9</option>
+                            <option>10</option>
+                        </select>
+                    </div>
+                    <button id="btn-generate-quiz" class="btn btn-primary">生成题目</button>
+                </div>
+                <div id="quiz-status" class="upload-status" hidden></div>
+                <div id="quiz-list" class="quiz-list">
+                    <div class="quiz-empty">请先在左侧选择课程，再生成题目</div>
                 </div>
             </section>
         </main>

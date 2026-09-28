@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initCourseModal();
     initUpload();
     initChat();
+    initQuiz();
     loadCourses();
 });
 
@@ -129,26 +130,21 @@ async function sendMessage() {
         return;
     }
 
-    // 1. 用户消息立即上屏
     appendMessage("user", question);
     input.value = "";
 
-    // 2. 显示"AI 思考中"加载
     isThinking = true;
     const thinkingEl = appendThinking();
 
     try {
-        // 3. 调用后端 RAG 问答
         const result = await api.post(`/courses/${currentCourse.id}/chat`, {
             question,
             session_id: null,
         });
         thinkingEl.remove();
-        // 4. 显示回答与引用来源
         appendMessage("assistant", result.answer, result.sources);
     } catch (err) {
         thinkingEl.remove();
-        // 5. 错误提示：知识库为空等业务错误
         const msg = err && err.code === 400 ? "请先上传文档" : "请求失败，请稍后重试";
         appendMessage("assistant", msg);
     } finally {
@@ -182,7 +178,6 @@ function appendMessage(role, content, sources = null) {
     bubble.textContent = content;
     msgDiv.appendChild(bubble);
 
-    // 引用来源（浅灰色卡片）
     if (sources && sources.length > 0) {
         const sourcesDiv = document.createElement("div");
         sourcesDiv.className = "sources";
@@ -216,6 +211,175 @@ function clearHint(container) {
     if (hint) hint.remove();
 }
 
+// ============ 自动出题 ============
+function initQuiz() {
+    const btn = document.getElementById("btn-generate-quiz");
+    btn.addEventListener("click", () => generateQuiz());
+}
+
+async function generateQuiz() {
+    if (!currentCourse) {
+        alert("请先在左侧选择课程");
+        return;
+    }
+
+    const type = document.getElementById("quiz-type").value;
+    const difficulty = document.getElementById("quiz-difficulty").value;
+    const count = parseInt(document.getElementById("quiz-count").value, 10);
+
+    const status = document.getElementById("quiz-status");
+    const list = document.getElementById("quiz-list");
+    status.hidden = false;
+    status.className = "upload-status loading";
+    status.textContent = "AI 出题中…，请稍候";
+    list.innerHTML = "";
+
+    try {
+        const batch = await api.post(`/courses/${currentCourse.id}/quizzes/generate`, {
+            topic: null,
+            question_type: type,
+            difficulty,
+            count,
+        });
+        status.hidden = true;
+        renderQuiz(batch.questions || []);
+    } catch (err) {
+        status.className = "upload-status error";
+        status.textContent = "出题失败，请重试";
+    }
+}
+
+function renderQuiz(questions) {
+    const container = document.getElementById("quiz-list");
+    container.innerHTML = "";
+    if (!questions || questions.length === 0) {
+        container.innerHTML = '<div class="quiz-empty">未生成题目</div>';
+        return;
+    }
+    questions.forEach((q, index) => {
+        container.appendChild(createQuizCard(q, index));
+    });
+}
+
+function createQuizCard(q, index) {
+    const card = document.createElement("div");
+    card.className = "quiz-card";
+
+    // 题目
+    const questionEl = document.createElement("div");
+    questionEl.className = "quiz-question";
+    questionEl.textContent = `${index + 1}. ${q.question}`;
+    card.appendChild(questionEl);
+
+    if (q.type !== "short") {
+        // 客观题：选项列表（简答题主区域仅显示题干）
+        const optionsEl = document.createElement("div");
+        optionsEl.className = "quiz-options";
+        (q.options || []).forEach((opt, i) => {
+            const optEl = document.createElement("div");
+            optEl.className = "quiz-option";
+            optEl.textContent = opt;
+            optEl.dataset.index = String(i);
+            optEl.addEventListener("click", () => handleOptionClick(q, card, optEl, i));
+            optionsEl.appendChild(optEl);
+        });
+        card.appendChild(optionsEl);
+    }
+
+    // 查看解析（默认折叠）
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "quiz-actions";
+    const toggleBtn = document.createElement("button");
+    toggleBtn.className = "btn btn-secondary btn-sm";
+    toggleBtn.textContent = "查看解析";
+    actionsEl.appendChild(toggleBtn);
+    card.appendChild(actionsEl);
+
+    const answerEl = document.createElement("div");
+    answerEl.className = "quiz-answer";
+    answerEl.hidden = true;
+    const answerLabel = q.type === "short" ? "参考答案：" : "答案：";
+    answerEl.innerHTML =
+        '<div class="answer-line"><strong>' + answerLabel + '</strong>' + escapeHtml(q.answer || "无") + "</div>" +
+        '<div class="explanation-line"><strong>解析：</strong>' + escapeHtml(q.explanation || "无") + "</div>";
+    card.appendChild(answerEl);
+
+    toggleBtn.addEventListener("click", () => {
+        answerEl.hidden = !answerEl.hidden;
+        toggleBtn.textContent = answerEl.hidden ? "查看解析" : "收起解析";
+    });
+
+    return card;
+}
+
+function handleOptionClick(q, card, optEl, index) {
+    const type = q.type;
+
+    if (type === "multiple") {
+        // 多选：toggle 选中，等待提交
+        optEl.classList.toggle("selected");
+        ensureSubmitButton(q, card);
+        return;
+    }
+
+    // 单选 / 判断：点击即判
+    if (card.dataset.answered) return;
+    card.dataset.answered = "1";
+
+    const options = card.querySelectorAll(".quiz-option");
+    const correct =
+        type === "judge"
+            ? q.options[index] === q.answer
+            : q.options[index][0] === q.answer;
+
+    options.forEach((opt, i) => {
+        opt.classList.add("disabled");
+        const isAnswer =
+            type === "judge"
+                ? q.options[i] === q.answer
+                : q.options[i][0] === q.answer;
+        if (isAnswer) opt.classList.add("correct");
+    });
+    optEl.classList.add(correct ? "correct" : "wrong");
+}
+
+function ensureSubmitButton(q, card) {
+    if (card.querySelector(".btn-submit")) return;
+    const actions = card.querySelector(".quiz-actions");
+    const submitBtn = document.createElement("button");
+    submitBtn.className = "btn btn-primary btn-sm btn-submit";
+    submitBtn.textContent = "提交答案";
+    submitBtn.addEventListener("click", () => handleMultipleSubmit(q, card));
+    actions.prepend(submitBtn);
+}
+
+function handleMultipleSubmit(q, card) {
+    if (card.dataset.answered) return;
+    card.dataset.answered = "1";
+
+    const selected = [];
+    card.querySelectorAll(".quiz-option.selected").forEach((opt) => {
+        selected.push(q.options[parseInt(opt.dataset.index, 10)][0]);
+    });
+    const userAnswer = selected.sort().join("");
+    const correctAnswer = (q.answer || "").split("").sort().join("");
+    const correct = userAnswer === correctAnswer;
+
+    card.querySelectorAll(".quiz-option").forEach((opt) => {
+        opt.classList.add("disabled");
+        const letter = q.options[parseInt(opt.dataset.index, 10)][0];
+        if ((q.answer || "").includes(letter)) opt.classList.add("correct");
+    });
+    if (!correct) {
+        card.querySelectorAll(".quiz-option.selected").forEach((opt) => {
+            opt.classList.add("wrong");
+        });
+    }
+
+    const submitBtn = card.querySelector(".btn-submit");
+    if (submitBtn) submitBtn.remove();
+}
+
 // 加载课程列表
 async function loadCourses() {
     const list = document.getElementById("course-list");
@@ -247,6 +411,7 @@ function selectCourse(course, li) {
     li.classList.add("active");
     currentCourse = { id: course.id, name: course.name };
     document.getElementById("current-course-name").textContent = course.name;
+    document.getElementById("quiz-current-course").textContent = course.name;
     loadDocuments(course.id);
     resetChat();
 }
