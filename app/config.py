@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         default="https://api.siliconflow.cn/v1",
         description="硅基流动 Base URL",
     )
-    llm_model: str = Field(default="Qwen/Qwen2.5-7B-Instruct", description="大语言模型")
+    llm_model: str = Field(default="deepseek-ai/DeepSeek-V4-Flash", description="大语言模型")
     embedding_model: str = Field(default="BAAI/bge-m3", description="Embedding 模型")
     top_k: int = Field(default=10, description="检索召回数量")
 

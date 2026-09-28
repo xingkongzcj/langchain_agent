@@ -35,7 +35,7 @@
                            │
               ┌────────────▼──────────────────────────┐
               │  硅基流动 SiliconFlow（OpenAI 兼容接口）  │
-              │  LLM：Qwen 系列   Embedding：BAAI/bge-m3│
+              │  LLM：DeepSeek-V4-Flash  Embedding：BAAI/bge-m3│
               └───────────────────────────────────────┘
 ```
 
@@ -67,7 +67,7 @@
 | AI 编排 | LangChain | 内置文档 Loader、TextSplitter、向量库、Prompt 模板等 RAG 抽象 |
 | 业务库 | MySQL 8.0 | 成熟稳定，作为唯一业务数据库存储结构化数据 |
 | 向量库 | Chroma（本地持久化向量库） | 轻量、本地持久化、无需额外服务，`chromadb` 与 `langchain-chroma` 已在依赖中，适合快速原型开发 |
-| LLM/Embedding | SiliconFlow OpenAI 兼容接口 | 国内直连、按量付费，LLM（Qwen）+ Embedding（BAAI/bge-m3）统一接入 |
+| LLM/Embedding | SiliconFlow OpenAI 兼容接口 | 国内直连、按量付费，LLM（DeepSeek-V4-Flash）+ Embedding（BAAI/bge-m3）统一接入 |
 | 前端 | 原生 HTML/CSS/JS | 无构建工具、无框架依赖 |
 | 部署 | Docker + docker-compose | 本地仅需启动 MySQL 一个容器 |
 
@@ -373,7 +373,7 @@ SILICONFLOW_API_KEY=sk-xxxxxxxx
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 
 # 模型配置
-LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
+LLM_MODEL=deepseek-ai/DeepSeek-V4-Flash
 EMBEDDING_MODEL=BAAI/bge-m3
 
 # 检索参数

@@ -221,7 +221,7 @@ Then  该条目状态更新为"已完成"
 | AI 框架 | LangChain | RAG 编排、文档加载、切分、向量库、Prompt 模板 |
 | 业务数据库 | MySQL 8.0 | 存储课程、文档、题目、错题本、复习计划等结构化数据 |
 | 向量数据库 | Chroma | 轻量级本地持久化向量库，无需额外容器 |
-| 大模型 | 硅基流动（SiliconFlow）OpenAI 兼容接口 | LLM（Qwen 系列）+ Embedding（BAAI/bge-m3） |
+| 大模型 | 硅基流动（SiliconFlow）OpenAI 兼容接口 | LLM（DeepSeek-V4-Flash）+ Embedding（BAAI/bge-m3） |
 | 前端 | 原生 HTML + CSS + JavaScript | 无框架依赖，静态页面 + fetch 调用后端 API |
 | 部署 | Docker + docker-compose | 一键启动 MySQL、Backend（Chroma本地持久化） |
 
