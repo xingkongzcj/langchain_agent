@@ -645,12 +645,6 @@ body {
     gap: 20px;
 }
 
-.review-plan-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
 .review-group {
     background-color: #fff;
     border: 1px solid #e5e7eb;

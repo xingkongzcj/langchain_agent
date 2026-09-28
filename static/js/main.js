@@ -603,11 +603,6 @@ function renderReviewPlan(plan) {
     const list = document.getElementById("review-list");
     list.innerHTML = "";
 
-    const title = document.createElement("div");
-    title.className = "review-plan-title";
-    title.textContent = plan.name;
-    list.appendChild(title);
-
     if (!plan.items || plan.items.length === 0) {
         const empty = document.createElement("div");
         empty.className = "quiz-empty";
