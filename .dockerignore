@@ -1,0 +1,18 @@
+# 构建镜像时排除的文件（减小上下文、避免把密钥打进镜像）
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.idea
+.env
+chroma_db
+chroma_vsdb
+_reference
+docs
+tests
+*.md
+pytest.ini
+requirements-dev.txt

@@ -19,6 +19,7 @@
 | 语言 | Python 3.11 |
 | Web 框架 | FastAPI + Uvicorn |
 | AI 编排 | LangChain |
+| 文档解析 | pypdf（PDF）、python-docx（Word）、原生文本（MD/TXT） |
 | 业务数据库 | MySQL 8.0 |
 | 向量数据库 | Chroma（本地持久化） |
 | LLM / Embedding | 硅基流动（SiliconFlow）OpenAI 兼容接口：`deepseek-ai/DeepSeek-V4-Flash` + `BAAI/bge-m3` |
@@ -66,9 +67,13 @@ langchain_agent/
 ├── docs/                    # PRD / SPEC / AGENTS 规范文档
 ├── .env                     # 环境变量（不提交）
 ├── .env.example             # 环境变量样例
-├── requirements.txt
+├── requirements.txt         # 生产依赖（已精简）
+├── requirements-dev.txt     # 测试依赖（pytest）
+├── Dockerfile               # 生产镜像
+├── .dockerignore
+├── deploy.py                # 一键部署脚本（上传 + 构建 + 启动 + 自检）
 ├── pytest.ini               # pytest 配置
-├── docker-compose.yml       # MySQL 容器编排
+├── docker-compose.yml       # MySQL + 应用容器编排
 └── README.md
 ```
 
@@ -123,6 +128,9 @@ uvicorn app.main:app --reload --port 8000
 ### 6. 运行测试
 
 ```bash
+# 测试依赖（生产镜像不装）
+pip install -r requirements-dev.txt
+
 # 方式一：pytest（验证 import 与测试收集）
 .venv\Scripts\python.exe -m pytest -v
 
@@ -165,6 +173,44 @@ uvicorn app.main:app --reload --port 8000
 - **前端**：「复习计划」Tab，点「生成复习计划」→ 按日期分组展示复习条目，勾选完成。
 - **实现**：读取未掌握错题 → LLM 生成 7 天计划（只返回第 N 天，日期由 Python 计算）→ 写入 `review_plans` / `review_items`。
 - **相关 API**：`POST /api/courses/{id}/review-plans`、`GET /api/courses/{id}/review-plans`、`GET /api/review-plans/{id}`、`PATCH /api/review-items/{id}`。
+
+## 依赖精简说明
+
+原 `requirements.txt` 是「学习环境全量清单」（jupyter、torch、transformers、unstructured、milvus、psycopg、langgraph、MCP 等），体积约 2–3 GB，与项目实际代码无关。现已按真实 import 收敛为 **14 个直接依赖**：
+
+- 文档解析从 `unstructured`（依赖 torch/onnx/opencv）换成 `pypdf` + `python-docx`，`app/services/document_service.py` 同步改写；Markdown 仍走「标题两层切分」。
+- 补齐了原本缺失的 `python-multipart`（FastAPI 解析 `UploadFile` 必需）。
+- `pytest` 移到 `requirements-dev.txt`，生产镜像不再安装。
+- 格式支持相应调整：`.pdf / .docx / .md / .txt`；`.doc` 需另存为 `.docx`。
+
+## 服务器部署（Docker）
+
+生产环境用 `docker-compose.yml` 同时管理 MySQL 与应用；应用镜像由 `Dockerfile` 构建，`deploy.py` 负责上传、构建、启动与自检。
+
+```bash
+# 本地执行（需要 paramiko；凭据只走环境变量，不落盘）
+export SM_SSH_PASSWORD='服务器 root 密码'
+export SM_API_KEY='sk-...'
+python deploy.py probe       # 探测环境（系统、Docker、镜像源、端口）
+python deploy.py bootstrap   # 首次：装 Docker、配镜像加速、补 swap、拉基础镜像
+python deploy.py upload      # 上传代码并写 .env（权限 600）
+python deploy.py build       # 构建镜像
+python deploy.py up          # 启动并等待 /api/health 就绪
+python deploy.py status      # 容器状态 + 内存/CPU 占用
+```
+
+服务器上的布局：
+
+| 路径 / 资源 | 说明 |
+| --- | --- |
+| `/opt/studymate` | 部署目录（代码、`.env`、compose 文件） |
+| 卷 `mysql_data` | MySQL 数据 |
+| 卷 `chroma_data` | Chroma 向量库（容器内 `/data/chroma`） |
+
+- 应用容器以非 root 用户（uid 10001）运行；MySQL 仅绑定 `127.0.0.1:3307`，公网不可达。
+- 需在云厂商安全组放行 **8000** 端口。
+- 国内机器 Docker Hub 不可达，`bootstrap` 会写入 `/etc/docker/daemon.json` 使用公共镜像站。
+- 时区固定 `Asia/Shanghai`（复习计划按本地日期生成，容器默认 UTC 会错位 8 小时）。
 
 ## 项目文档
 

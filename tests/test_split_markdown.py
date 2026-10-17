@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from langchain_community.document_loaders import TextLoader
+from langchain_core.documents import Document
 
 from app.services.document_service import split_documents
 
@@ -27,7 +27,7 @@ def main() -> None:
         return
 
     # 读取原始 Markdown（保留 # 标题语法）
-    raw_docs = TextLoader(file_path, encoding="utf-8").load()
+    raw_docs = [Document(page_content=Path(file_path).read_text(encoding="utf-8"))]
     if not raw_docs:
         print(f"[错误] {file_path} 内容为空。")
         return

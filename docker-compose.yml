@@ -1,16 +1,68 @@
+# 智学助手（StudyMate）生产编排：MySQL 8 + FastAPI 应用
+# 启动：docker compose up -d --build
+# 说明：MySQL 仅绑定 127.0.0.1，不对外暴露；应用对外暴露 8000。
 services:
   mysql:
-    image: mysql:8.0
+    image: ${MYSQL_IMAGE:-mysql:8.0}
     container_name: study_mate_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: study_mate
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-study_mate}
+      TZ: Asia/Shanghai
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # 2C2G 小机器上的内存收敛参数
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=50
+      - --performance-schema=OFF
     ports:
-      - "3307:3306"
+      # 只绑本机，方便 ssh 隧道排查，公网不可达
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-python:3.11-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}
+    image: studymate-app:1.0.0
+    container_name: study_mate_app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # 容器内通过服务名访问 MySQL（覆盖 .env 里的 localhost:3307）
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      CHROMA_PERSIST_DIR: /data/chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data/chroma
+    depends_on:
+      mysql:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   mysql_data:
+  chroma_data:

@@ -5,28 +5,27 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from docx import Document as DocxDocument
 from fastapi import UploadFile
-from langchain_community.document_loaders import (
-    TextLoader,
-    UnstructuredFileLoader,
-    UnstructuredPDFLoader,
-    UnstructuredWordDocumentLoader,
-)
-from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document as LangchainDocument
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+from pypdf import PdfReader
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
 from app.db.chroma import get_vectorstore
 from app.models.document import Document as DocumentModel
 
-# 支持的文件扩展名
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".md", ".txt"}
+# 支持的文件扩展名（.doc 为旧版二进制格式，需先另存为 .docx）
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".md", ".txt"}
 
 # 切分参数
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
+
+# 上传大小限制
+MAX_UPLOAD_MB = 20
+MAX_UPLOAD_SIZE = MAX_UPLOAD_MB * 1024 * 1024
 
 # Markdown 标题切分规则
 MARKDOWN_HEADERS = [
@@ -36,21 +35,57 @@ MARKDOWN_HEADERS = [
 ]
 
 
-def _select_loader(file_path: str) -> BaseLoader:
-    """根据文件扩展名选择合适的文档 Loader。
+def _load_text(file_path: str) -> list[LangchainDocument]:
+    """读取纯文本 / Markdown。
 
-    注意：Markdown 使用 TextLoader 保留原始 # 标题语法，
-    以便 MarkdownHeaderTextSplitter 正确识别章节层级。
+    注意：Markdown 保留原始 # 标题语法，以便 MarkdownHeaderTextSplitter 识别章节层级。
     """
+    text = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+    return [LangchainDocument(page_content=text, metadata={"source": file_path})]
+
+
+def _load_pdf(file_path: str) -> list[LangchainDocument]:
+    """逐页提取 PDF 文本（pypdf，纯 Python，无需 torch/OCR 模型）。"""
+    reader = PdfReader(file_path)
+    docs: list[LangchainDocument] = []
+    for page_index, page in enumerate(reader.pages):
+        text = page.extract_text() or ""
+        if text.strip():
+            docs.append(
+                LangchainDocument(
+                    page_content=text,
+                    metadata={"source": file_path, "page": page_index},
+                )
+            )
+    return docs
+
+
+def _load_docx(file_path: str) -> list[LangchainDocument]:
+    """提取 Word（.docx）正文段落与表格文本（python-docx）。"""
+    document = DocxDocument(file_path)
+    parts: list[str] = [p.text for p in document.paragraphs if p.text.strip()]
+    # 表格转成「单元格 | 单元格」的文本行，避免表格内容丢失
+    for table in document.tables:
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells]
+            if any(cells):
+                parts.append(" | ".join(cells))
+    return [LangchainDocument(page_content="\n".join(parts), metadata={"source": file_path})]
+
+
+def _load_document(file_path: str) -> list[LangchainDocument]:
+    """根据扩展名解析文档为 LangChain Document 列表。"""
     ext = Path(file_path).suffix.lower()
     if ext in {".txt", ".md"}:
-        return TextLoader(file_path, encoding="utf-8")
+        return _load_text(file_path)
     if ext == ".pdf":
-        return UnstructuredPDFLoader(file_path)
-    if ext in {".docx", ".doc"}:
-        return UnstructuredWordDocumentLoader(file_path)
-    # 兜底：通用 Unstructured Loader
-    return UnstructuredFileLoader(file_path)
+        return _load_pdf(file_path)
+    if ext == ".docx":
+        return _load_docx(file_path)
+    raise BusinessException(
+        code=400,
+        message=f"不支持的文件类型: {ext or '未知'}（若为 .doc，请另存为 .docx 后上传）",
+    )
 
 
 def _split_markdown(raw_docs: list[LangchainDocument]) -> list[LangchainDocument]:
@@ -149,8 +184,7 @@ def ingest_document(
 
     try:
         # 2. 解析文档
-        loader = _select_loader(file_path)
-        raw_docs = loader.load()
+        raw_docs = _load_document(file_path)
         if not raw_docs:
             raise BusinessException(code=400, message="文档内容为空，无法入库")
 
@@ -198,9 +232,16 @@ async def ingest_upload_file(
     filename = upload_file.filename or "unnamed"
     ext = Path(filename).suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
-        raise BusinessException(code=400, message=f"不支持的文件类型: {ext or '未知'}")
+        hint = "（.doc 请另存为 .docx 后上传）" if ext == ".doc" else ""
+        raise BusinessException(code=400, message=f"不支持的文件类型: {ext or '未知'}{hint}")
+
+    # 限制单文件大小，避免小内存服务器被大文件上传打爆
+    if upload_file.size and upload_file.size > MAX_UPLOAD_SIZE:
+        raise BusinessException(code=400, message=f"文件超过 {MAX_UPLOAD_MB}MB 限制")
 
     content = await upload_file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise BusinessException(code=400, message=f"文件超过 {MAX_UPLOAD_MB}MB 限制")
 
     # 保存到临时文件（Loader 需要文件路径）
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_file:
