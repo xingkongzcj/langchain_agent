@@ -146,9 +146,10 @@ pip install -r requirements-dev.txt
 ### F1 上传文档
 
 - **前端**：左侧「新建课程」创建课程 → 选中课程 → 「文档管理」Tab → 点「上传文档」选择文件。
-- **支持格式**：PDF、Word（.docx/.doc）、Markdown、TXT。
+- **支持格式**：PDF、Word（.docx）、Markdown、TXT（`.doc` 需另存为 `.docx`）。
 - **Markdown 特化切分**：按 `#/##/###` 标题两层切分，保留章节 metadata（h1/h2/h3），提升检索命中率。
-- **相关 API**：`POST /api/courses/{id}/documents`、`GET /api/courses/{id}/documents`。
+- **删除文档**：文档列表每条右侧「×」，确认后按 `metadata.document_id` 同步删除该文档在 Chroma 中的向量与 MySQL 记录（不影响同课程其他文档）。
+- **相关 API**：`POST /api/courses/{id}/documents`、`GET /api/courses/{id}/documents`、`DELETE /api/documents/{document_id}`。
 
 ### F2 智能问答
 

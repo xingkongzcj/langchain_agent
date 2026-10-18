@@ -652,13 +652,54 @@ async function loadDocuments(courseId) {
         docs.forEach((doc) => {
             const li = document.createElement("li");
             li.className = "doc-item";
-            li.innerHTML =
-                '<div class="doc-name">' + escapeHtml(doc.filename) + "</div>" +
-                '<div class="doc-meta">类型: ' + (doc.file_type || "-") +
+
+            const head = document.createElement("div");
+            head.className = "doc-head";
+
+            const name = document.createElement("span");
+            name.className = "doc-name";
+            name.textContent = doc.filename;
+            name.title = doc.filename;
+
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "doc-delete";
+            delBtn.title = "删除文档";
+            delBtn.textContent = "×";
+            delBtn.addEventListener("click", () => deleteDocument(doc));
+
+            head.appendChild(name);
+            head.appendChild(delBtn);
+
+            const meta = document.createElement("div");
+            meta.className = "doc-meta";
+            meta.textContent =
+                "类型: " + (doc.file_type || "-") +
                 " · 分块: " + doc.chunk_count +
-                " · 状态: " + doc.status + "</div>";
+                " · 状态: " + doc.status;
+
+            li.appendChild(head);
+            li.appendChild(meta);
             list.appendChild(li);
         });
+    } catch (err) {
+        // 错误已在 api.js 中提示
+    }
+}
+
+async function deleteDocument(doc) {
+    const confirmed = confirm(
+        `确定删除文档【${doc.filename}】吗？该文档的向量数据会一并删除，且不可恢复。`
+    );
+    if (!confirmed) return;
+
+    try {
+        await api.del(`/documents/${doc.id}`);
+        if (currentCourse) {
+            await loadDocuments(currentCourse.id);
+            // 向量已变化，清空对话避免继续引用已删除的内容
+            resetChat();
+        }
     } catch (err) {
         // 错误已在 api.js 中提示
     }

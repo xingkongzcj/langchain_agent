@@ -1,5 +1,6 @@
 """文档入库服务：解析、切分、向量化。"""
 
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -15,6 +16,8 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import BusinessException
 from app.db.chroma import get_vectorstore
 from app.models.document import Document as DocumentModel
+
+logger = logging.getLogger(__name__)
 
 # 支持的文件扩展名（.doc 为旧版二进制格式，需先另存为 .docx）
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".md", ".txt"}
@@ -271,3 +274,31 @@ def list_documents(db: Session, course_id: int) -> list[DocumentModel]:
         .order_by(DocumentModel.id.desc())
         .all()
     )
+
+
+def delete_document(db: Session, document_id: int) -> None:
+    """删除文档：先删 Chroma 中该文档的向量，再删 MySQL 记录，保持双库一致。
+
+    一个课程的所有文档共用一个 collection，因此这里按 metadata.document_id
+    精确删除，不能整库删除。
+    """
+    doc = db.get(DocumentModel, document_id)
+    if not doc:
+        raise BusinessException(code=404, message="文档不存在")
+
+    course_id = doc.course_id
+    filename = doc.filename
+
+    # 1. 删除该文档的向量（按 metadata 过滤，不影响同课程其他文档）
+    try:
+        vectorstore = get_vectorstore(f"course_{course_id}")
+        vectorstore._collection.delete(where={"document_id": document_id})
+    except Exception as exc:  # noqa: BLE001 向量库异常统一转业务错误
+        logger.error("删除文档向量失败 document_id=%s: %s", document_id, exc)
+        # 向量没删掉就保留记录，避免出现「查得到但删不掉」的幽灵数据
+        raise BusinessException(code=500, message=f"删除文档向量失败: {exc}") from exc
+
+    # 2. 删除 MySQL 记录
+    db.delete(doc)
+    db.commit()
+    logger.info("已删除文档 id=%s filename=%s course_id=%s", document_id, filename, course_id)

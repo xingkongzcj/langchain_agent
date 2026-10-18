@@ -261,10 +261,44 @@ body {
     margin-bottom: 10px;
 }
 
+.doc-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
 .doc-name {
     font-size: 15px;
     font-weight: 600;
     margin-bottom: 4px;
+}
+
+.doc-head .doc-name {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.doc-delete {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    color: #9ca3af;
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.doc-delete:hover {
+    color: #ef4444;
+    background-color: #fef2f2;
 }
 
 .doc-meta {
@@ -919,6 +953,12 @@ body {
 
     .course-item {
         padding: 14px;
+    }
+
+    /* 移动端删除按钮放大触摸区域 */
+    .doc-delete {
+        padding: 8px 12px;
+        font-size: 22px;
     }
 
     .quiz-option {

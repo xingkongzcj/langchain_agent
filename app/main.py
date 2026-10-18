@@ -58,6 +58,7 @@ app.add_middleware(
 # 注册业务路由
 app.include_router(courses.router)
 app.include_router(documents.router)
+app.include_router(documents.documents_router)
 app.include_router(chat.router)
 app.include_router(quiz.router)
 app.include_router(mistake.router)
