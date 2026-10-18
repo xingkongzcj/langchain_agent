@@ -22,41 +22,46 @@
 
 前提：安全组已放行 `80`、`443`；域名 A 记录已指向 `47.109.147.248`。
 
+> **⚠️ 关键**：切换会把 stunnel 从 443 挪走，而 SSH 正是走这条隧道。
+> **绝不能在 SSH 会话里直接执行**，否则重启 stunnel 的瞬间会掐断自己的连接。
+> 必须用 `nohup` 脱离会话运行（或直接在阿里云 Workbench 里跑）。
+
 ```bash
-# 1) 签证书（HTTP-01，需要 80 可被外网访问）
+# 1) 签证书（HTTP-01；此时域名已可访问）
 sudo certbot certonly --nginx -d xingkongzcj.cloud -d www.xingkongzcj.cloud
 
-# 2) 装 HTTPS 站点配置
+# 2) 挂上 HTTPS 站点（监听 8443，由 443 分流转发进来）
 sudo cp /opt/studymate/deploy/nginx/studymate-https.conf /etc/nginx/sites-available/
 sudo ln -sf /etc/nginx/sites-available/studymate-https.conf /etc/nginx/sites-enabled/
-
-# 3) stunnel 从 443 挪到本机 4430（只监听回环，不再对外）
-sudo sed -i 's/^accept  = 443/accept  = 127.0.0.1:4430/' /etc/stunnel/ssh-tls.conf
-sudo systemctl restart ssh-tls
-
-# 4) 启用 443 SNI 分流（stream 块必须在 nginx.conf 主配置层）
-sudo tee -a /etc/nginx/nginx.conf < /opt/studymate/deploy/nginx/stream-split.conf
-
-# 5) 校验并生效
 sudo nginx -t && sudo systemctl reload nginx
 
-# 6) 验证
+# 3) 切换 443（脱离会话运行，脚本自带校验 + 失败自动回滚）
+sudo nohup bash /opt/studymate/deploy/scripts/switch-443.sh >/dev/null 2>&1 &
+sleep 15
+sudo tail -20 /var/log/studymate-switch-443.log     # 看到「切换成功」即完成
+
+# 4) 启用 80 → https 跳转（先禁用 HTTP 站点，避免同名 server 冲突）
+sudo rm -f /etc/nginx/sites-enabled/studymate.conf
+sudo cp /opt/studymate/deploy/nginx/studymate-redirect.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/studymate-redirect.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# 5) 验证
 curl -I https://xingkongzcj.cloud
 ssh studymate true && echo "SSH 通道正常"
 ```
 
-> 注意：Ubuntu 的 nginx 若把 stream 编译成动态模块，`nginx.conf` 顶部需要有
-> `load_module modules/ngx_stream_module.so;`（通常已由 `/etc/nginx/modules-enabled/50-mod-stream.conf` 提供），
+> 注意：Ubuntu 的 nginx 把 stream 编译成动态模块，需要装 `libnginx-mod-stream`。
+> 装好后 `/etc/nginx/modules-enabled/50-mod-stream.conf` 会自动 `load_module`，
 > 否则 `nginx -t` 会报 `unknown directive "map"`。
 
 ### 回滚
 
 ```bash
-sudo rm -f /etc/nginx/sites-enabled/studymate-https.conf
-# 删除 nginx.conf 里追加的 stream 段
-sudo sed -i 's/^accept  = 127.0.0.1:4430/accept  = 443/' /etc/stunnel/ssh-tls.conf
-sudo systemctl restart ssh-tls
+sudo cp /root/studymate-switch-*/nginx.conf   /etc/nginx/nginx.conf
+sudo cp /root/studymate-switch-*/ssh-tls.conf /etc/stunnel/ssh-tls.conf
 sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl restart ssh-tls
 ```
 
 ## 提前签证书（可选，不需要备案）
