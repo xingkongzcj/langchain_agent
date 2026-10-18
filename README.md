@@ -212,6 +212,33 @@ python deploy.py status      # 容器状态 + 内存/CPU 占用
 - 国内机器 Docker Hub 不可达，`bootstrap` 会写入 `/etc/docker/daemon.json` 使用公共镜像站。
 - 时区固定 `Asia/Shanghai`（复习计划按本地日期生成，容器默认 UTC 会错位 8 小时）。
 
+### 校园网 / 运营商封 SSH
+
+部分校园网和运营商会按**协议特征**拦截 SSH（TCP 能握手成功，但读不到 `SSH-2.0` 横幅），这种情况换端口没有用。解决办法是在服务器上用 `stunnel` 把 SSH 包进 TLS：
+
+```ini
+# /etc/stunnel/ssh-tls.conf
+foreground = yes
+[ssh-tls]
+accept  = 443
+connect = 127.0.0.1:22
+cert    = /etc/stunnel/ssh-tls.crt
+key     = /etc/stunnel/ssh-tls.key
+```
+
+配合独立的 `ssh-tls.service`（`ExecStart=/usr/bin/stunnel4 /etc/stunnel/ssh-tls.conf`）常驻，并在安全组放行 443。客户端在 `~/.ssh/config` 里用 `ProxyCommand` 先建 TLS 隧道：
+
+```
+Host studymate
+    HostName <服务器 IP>
+    User root
+    ProxyCommand openssl s_client -quiet -verify_quiet -connect <服务器 IP>:443 -servername <服务器 IP>
+```
+
+`deploy.py` 会先探测 22 端口能否真的跑 SSH，不能时自动改走 TLS 443；也可用 `SM_SSH_TLS=1` 强制。
+
+> 注意：443 被 SSH-TLS 占用后，同一台机器就不能直接放 HTTPS 站点了（需要的话改用 8443 或做 SNI 分流）。
+
 ## 项目文档
 
 | 文档 | 说明 |

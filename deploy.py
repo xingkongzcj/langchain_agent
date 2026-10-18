@@ -32,29 +32,89 @@ USER = os.environ.get("SM_SSH_USER", "root")
 PASSWORD = os.environ.get("SM_SSH_PASSWORD", "")
 REMOTE_DIR = os.environ.get("SM_REMOTE_DIR", "/opt/studymate")
 
+# 部分网络（校园网/运营商）会按协议特征封 SSH，换端口也没用。
+# 服务器上用 stunnel 把 SSH 包进 TLS（监听 443），这里设置 SM_SSH_TLS=1 即可走该通道。
+TLS = os.environ.get("SM_SSH_TLS", "") not in ("", "0", "false", "False")
+TLS_PORT = int(os.environ.get("SM_SSH_TLS_PORT", "443"))
+
 LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIRS = ["app", "static"]
 UPLOAD_FILES = ["requirements.txt", "Dockerfile", ".dockerignore", "docker-compose.yml"]
 
 
+def _tls_socket():
+    """建立到 stunnel 的 TLS 连接（自签证书，不做校验）。"""
+    import socket as _socket
+    import ssl as _ssl
+
+    raw = _socket.create_connection((HOST, TLS_PORT), timeout=20)
+    ctx = _ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl.CERT_NONE
+    return ctx.wrap_socket(raw, server_hostname=HOST)
+
+
+def _direct_ssh_reachable() -> bool:
+    """探测 22 端口是否真的能跑 SSH。
+
+    校园网/运营商常按协议特征拦截 SSH：TCP 能连上，但读不到 banner。
+    直接拿 SSH 横幅做判定，避免 paramiko 在后台线程里抛一堆异常。
+    """
+    import socket as _socket
+
+    try:
+        with _socket.create_connection((HOST, PORT), timeout=6) as sock:
+            sock.settimeout(5)
+            return sock.recv(64).startswith(b"SSH-")
+    except OSError:
+        return False
+
+
 def connect() -> paramiko.SSHClient:
     if not PASSWORD:
         sys.exit("缺少环境变量 SM_SSH_PASSWORD")
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(
-        HOST,
-        port=PORT,
-        username=USER,
-        password=PASSWORD,
-        timeout=20,
-        banner_timeout=20,
-        auth_timeout=20,
-        look_for_keys=False,
-        allow_agent=False,
-    )
-    return client
+
+    base = {
+        "username": USER,
+        "password": PASSWORD,
+        "look_for_keys": False,
+        "allow_agent": False,
+    }
+
+    def _client() -> paramiko.SSHClient:
+        client = paramiko.SSHClient()
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        return client
+
+    def _direct() -> paramiko.SSHClient:
+        client = _client()
+        client.connect(HOST, port=PORT, timeout=15, banner_timeout=15, auth_timeout=15, **base)
+        return client
+
+    def _over_tls() -> paramiko.SSHClient:
+        client = _client()
+        client.connect(
+            HOST,
+            port=PORT,
+            timeout=20,
+            banner_timeout=20,
+            auth_timeout=20,
+            sock=_tls_socket(),
+            **base,
+        )
+        return client
+
+    if TLS:
+        print("[ssh] 使用 TLS 443 通道", file=sys.stderr)
+        return _over_tls()
+
+    if _direct_ssh_reachable():
+        print("[ssh] 22 端口直连", file=sys.stderr)
+        return _direct()
+
+    print("[ssh] 22 端口被网络拦截，改走 TLS 443 通道", file=sys.stderr)
+    return _over_tls()
 
 
 def run(ssh: paramiko.SSHClient, command: str, timeout: int = 3600, echo: bool = True) -> tuple[int, str]:
