@@ -2,14 +2,25 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1f2a44">
     <title>智学助手</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="app">
+        <!-- 移动端顶栏（桌面端隐藏） -->
+        <header class="mobile-bar">
+            <button id="btn-menu" class="menu-btn" type="button" aria-label="打开课程列表">☰</button>
+            <span class="mobile-title">智学助手</span>
+            <span id="mobile-course" class="mobile-course">未选择课程</span>
+        </header>
+
+        <!-- 移动端抽屉遮罩 -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop" hidden></div>
+
         <!-- 左侧侧边栏 -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h1 class="logo">智学助手</h1>
                 <p class="subtitle">课程知识库问答与出题智能体</p>
@@ -37,18 +48,18 @@
                 </div>
                 <div class="panel-toolbar">
                     <button id="btn-upload" class="btn btn-primary btn-sm">上传文档</button>
-                    <input type="file" id="file-input" accept=".pdf,.docx,.doc,.md,.txt" hidden>
+                    <input type="file" id="file-input" accept=".pdf,.docx,.md,.txt" hidden>
                 </div>
                 <div id="upload-status" class="upload-status" hidden></div>
                 <ul id="document-list" class="document-list">
-                    <li class="doc-empty">请先在左侧选择课程</li>
+                    <li class="doc-empty">请先选择课程</li>
                 </ul>
             </section>
 
             <section id="tab-chat" class="tab-panel">
                 <div class="chat-container">
                     <div id="chat-messages" class="chat-messages">
-                        <div class="chat-hint">请先在左侧选择课程，然后在下方输入问题</div>
+                        <div class="chat-hint">请先选择课程，然后在下方输入问题</div>
                     </div>
                     <div class="chat-input-bar">
                         <input type="text" id="chat-input" class="chat-input" placeholder="请输入你的问题，回车发送">
@@ -99,7 +110,7 @@
                 </div>
                 <div id="quiz-status" class="upload-status" hidden></div>
                 <div id="quiz-list" class="quiz-list">
-                    <div class="quiz-empty">请先在左侧选择课程，再生成题目</div>
+                    <div class="quiz-empty">请先选择课程，再生成题目</div>
                 </div>
             </section>
 
@@ -109,7 +120,7 @@
                     <span class="current-course">当前课程：<strong id="mistake-current-course">未选择</strong></span>
                 </div>
                 <div id="mistake-list" class="mistake-list">
-                    <div class="quiz-empty">请先在左侧选择课程</div>
+                    <div class="quiz-empty">请先选择课程</div>
                 </div>
             </section>
 
@@ -123,7 +134,7 @@
                 </div>
                 <div id="review-status" class="upload-status" hidden></div>
                 <div id="review-list" class="review-list">
-                    <div class="quiz-empty">请先在左侧选择课程，再生成复习计划</div>
+                    <div class="quiz-empty">请先选择课程，再生成复习计划</div>
                 </div>
             </section>
         </main>

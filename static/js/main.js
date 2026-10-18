@@ -10,8 +10,55 @@ document.addEventListener("DOMContentLoaded", () => {
     initChat();
     initQuiz();
     initReview();
+    initMobileSidebar();
     loadCourses();
 });
+
+// 移动端：侧边栏抽屉
+function initMobileSidebar() {
+    const menuBtn = document.getElementById("btn-menu");
+    const sidebar = document.getElementById("sidebar");
+    const backdrop = document.getElementById("sidebar-backdrop");
+    if (!menuBtn || !sidebar || !backdrop) return;
+
+    const openDrawer = () => {
+        sidebar.classList.add("open");
+        backdrop.hidden = false;
+    };
+    const closeDrawer = () => {
+        sidebar.classList.remove("open");
+        backdrop.hidden = true;
+    };
+
+    menuBtn.addEventListener("click", () => {
+        if (sidebar.classList.contains("open")) closeDrawer();
+        else openDrawer();
+    });
+    backdrop.addEventListener("click", closeDrawer);
+
+    // 由竖屏转横屏 / 窗口拉宽时复位，避免桌面端残留抽屉状态
+    window.addEventListener("resize", () => {
+        if (window.innerWidth > 768) closeDrawer();
+    });
+
+    // ESC 关闭
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeDrawer();
+    });
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById("sidebar");
+    const backdrop = document.getElementById("sidebar-backdrop");
+    if (sidebar) sidebar.classList.remove("open");
+    if (backdrop) backdrop.hidden = true;
+}
+
+// 移动端顶栏显示当前课程名
+function updateMobileCourseLabel(name) {
+    const el = document.getElementById("mobile-course");
+    if (el) el.textContent = name || "未选择课程";
+}
 
 // Tab 切换
 function initTabs() {
@@ -76,7 +123,7 @@ function initUpload() {
 
     uploadBtn.addEventListener("click", () => {
         if (!currentCourse) {
-            alert("请先在左侧选择课程");
+            alert("请先选择课程");
             return;
         }
         fileInput.click();
@@ -125,7 +172,7 @@ async function sendMessage() {
     const question = input.value.trim();
     if (!question) return;
     if (!currentCourse) {
-        alert("请先在左侧选择课程");
+        alert("请先选择课程");
         return;
     }
 
@@ -215,7 +262,7 @@ function initQuiz() {
 
 async function generateQuiz() {
     if (!currentCourse) {
-        alert("请先在左侧选择课程");
+        alert("请先选择课程");
         return;
     }
 
@@ -544,18 +591,19 @@ function clearMainContent() {
     document.getElementById("quiz-current-course").textContent = "未选择";
     document.getElementById("mistake-current-course").textContent = "未选择";
     document.getElementById("review-current-course").textContent = "未选择";
+    updateMobileCourseLabel("");
 
     document.getElementById("document-list").innerHTML =
-        '<li class="doc-empty">请先在左侧选择课程</li>';
+        '<li class="doc-empty">请先选择课程</li>';
     document.getElementById("chat-messages").innerHTML =
-        '<div class="chat-hint">请先在左侧选择课程，然后在下方输入问题</div>';
+        '<div class="chat-hint">请先选择课程，然后在下方输入问题</div>';
     document.getElementById("quiz-list").innerHTML =
-        '<div class="quiz-empty">请先在左侧选择课程，再生成题目</div>';
+        '<div class="quiz-empty">请先选择课程，再生成题目</div>';
     document.getElementById("quiz-status").hidden = true;
     document.getElementById("mistake-list").innerHTML =
-        '<div class="quiz-empty">请先在左侧选择课程</div>';
+        '<div class="quiz-empty">请先选择课程</div>';
     document.getElementById("review-list").innerHTML =
-        '<div class="quiz-empty">请先在左侧选择课程，再生成复习计划</div>';
+        '<div class="quiz-empty">请先选择课程，再生成复习计划</div>';
     document.getElementById("review-status").hidden = true;
 }
 
@@ -569,6 +617,9 @@ function selectCourse(course, li) {
     document.getElementById("quiz-current-course").textContent = course.name;
     document.getElementById("mistake-current-course").textContent = course.name;
     document.getElementById("review-current-course").textContent = course.name;
+    updateMobileCourseLabel(course.name);
+    // 手机上选完课程自动收起抽屉，直接回到内容区
+    closeMobileSidebar();
     loadDocuments(course.id);
     resetChat();
     resetQuiz();
@@ -585,7 +636,7 @@ function resetChat() {
 
 function resetQuiz() {
     document.getElementById("quiz-list").innerHTML =
-        '<div class="quiz-empty">请先在左侧选择课程，再生成题目</div>';
+        '<div class="quiz-empty">请先选择课程，再生成题目</div>';
     document.getElementById("quiz-status").hidden = true;
 }
 
@@ -621,7 +672,7 @@ function initReview() {
 
 async function generatePlan() {
     if (!currentCourse) {
-        alert("请先在左侧选择课程");
+        alert("请先选择课程");
         return;
     }
 
@@ -728,7 +779,7 @@ async function toggleReviewItem(itemId, checkbox, el) {
 
 function resetReview() {
     document.getElementById("review-list").innerHTML =
-        '<div class="quiz-empty">请先在左侧选择课程，再生成复习计划</div>';
+        '<div class="quiz-empty">请先选择课程，再生成复习计划</div>';
     document.getElementById("review-status").hidden = true;
 }
 
