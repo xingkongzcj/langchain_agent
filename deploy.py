@@ -38,7 +38,7 @@ TLS = os.environ.get("SM_SSH_TLS", "") not in ("", "0", "false", "False")
 TLS_PORT = int(os.environ.get("SM_SSH_TLS_PORT", "443"))
 
 LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIRS = ["app", "static"]
+UPLOAD_DIRS = ["app", "static", "deploy"]
 UPLOAD_FILES = ["requirements.txt", "Dockerfile", ".dockerignore", "docker-compose.yml"]
 
 

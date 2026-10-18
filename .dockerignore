@@ -13,6 +13,7 @@ chroma_vsdb
 _reference
 docs
 tests
+deploy
 *.md
 pytest.ini
 requirements-dev.txt
