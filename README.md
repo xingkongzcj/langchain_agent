@@ -188,6 +188,8 @@ pip install -r requirements-dev.txt
 
 生产环境用 `docker-compose.yml` 同时管理 MySQL 与应用；应用镜像由 `Dockerfile` 构建，`deploy.py` 负责上传、构建、启动与自检。
 
+线上地址：**<https://xingkongzcj.cloud>**（80 自动跳转 https；`http://47.109.147.248:8000` 作为兜底直连）
+
 ```bash
 # 本地执行（需要 paramiko；凭据只走环境变量，不落盘）
 export SM_SSH_PASSWORD='服务器 root 密码'

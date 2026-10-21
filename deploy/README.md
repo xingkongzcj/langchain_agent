@@ -6,17 +6,23 @@
 
 | 文件 | 用途 | 服务器位置 |
 | --- | --- | --- |
-| `nginx/studymate.conf` | HTTP 站点，反代到 `127.0.0.1:8000`（备案前使用） | `/etc/nginx/sites-available/studymate.conf` |
-| `nginx/studymate-https.conf` | HTTPS 站点（监听 8443）+ 80 跳转 443，备案后启用 | `/etc/nginx/sites-available/studymate-https.conf` |
+| `nginx/studymate.conf` | HTTP 站点，反代到 `127.0.0.1:8000`（备案前使用，现已停用） | `/etc/nginx/sites-available/studymate.conf` |
+| `nginx/studymate-https.conf` | HTTPS 站点（监听 8443，由 443 分流转发进来） | `/etc/nginx/sites-available/studymate-https.conf` |
+| `nginx/studymate-redirect.conf` | 80 → https 跳转 | `/etc/nginx/sites-available/studymate-redirect.conf` |
 | `nginx/stream-split.conf` | 443 按 SNI 分流：域名 → 站点，其余 → SSH-over-TLS | 追加进 `/etc/nginx/nginx.conf` 主配置层 |
 | `scripts/studymate-backup.sh` | MySQL + Chroma 备份，保留 7 天 | `/usr/local/bin/studymate-backup.sh` |
 | `scripts/studymate-backup.{service,timer}` | 每天 03:30 自动备份 | `/etc/systemd/system/` |
+| `scripts/switch-443.sh` | 443 切换（脱离会话运行、带校验与自动回滚） | `/opt/studymate/deploy/scripts/` |
 
-## 当前状态（备案未完成）
+## 当前状态（备案已完成）
 
-- `:80` → nginx → 应用，IP 可直接访问：<http://47.109.147.248/>
-- `:443` → **仍是 stunnel（SSH-over-TLS）**，没有动，校园网 SSH 不受影响
-- `:8000` → 应用（compose 直接映射，保留作为兜底）
+- **<https://xingkongzcj.cloud>** → nginx 443（SNI 分流）→ 8443 → 应用，Let's Encrypt 证书有效至 2027-01-16
+- `:80` → 301 跳转到 https
+- `:443` → nginx SNI 分流：`xingkongzcj.cloud` / `www` 走站点，**其余 SNI（含无 SNI）走 stunnel:4430 → 22**
+- `:8000` → 应用直连（保留作为兜底，可随时关闭）
+- 备份任务、证书自动续期均已启用
+
+> 踩坑记录：`map` 里给 `proxy_pass` 变量赋值时必须写 `IP:端口`，写 upstream 组名会导致连接被直接关闭。
 
 ## 备案通过后的切换步骤
 
