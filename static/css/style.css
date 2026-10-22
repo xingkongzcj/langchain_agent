@@ -157,6 +157,27 @@ body {
     overflow: hidden;
 }
 
+/* ICP 备案号（工信部要求，首页底部居中） */
+.site-footer {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    text-align: center;
+    background-color: #f5f6f8;
+    border-top: 1px solid #e5e7eb;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.site-footer a {
+    color: #9ca3af;
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    color: #4f7cff;
+    text-decoration: underline;
+}
+
 .tabs {
     display: flex;
     background-color: #fff;
@@ -874,7 +895,11 @@ body {
 
     .tab-panel {
         padding: 16px;
-        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    /* 页脚在移动端负责吃掉底部安全区 */
+    .site-footer {
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
     }
 
     .panel-header {
@@ -935,7 +960,6 @@ body {
 
     .chat-input-bar {
         padding: 10px;
-        padding-bottom: calc(10px + env(safe-area-inset-bottom));
     }
 
     /* iOS 输入框字号小于 16px 会自动放大页面 */
