@@ -195,7 +195,12 @@
 
 | 方法 | 路径 | 说明 | 请求 | 响应 data |
 | --- | --- | --- | --- | --- |
-| POST | `/api/courses/{course_id}/chat` | RAG 问答 | `{question, session_id?}` | `{answer, sources:[{filename,text}]}` |
+| POST | `/api/courses/{course_id}/chat` | RAG 问答（多轮） | `{question, session_id?}` | `{answer, sources:[{filename,text}]}` |
+| GET | `/api/courses/{course_id}/chat/history` | 获取会话历史 | `?session_id=xxx` | `[{role, content}]` |
+| DELETE | `/api/courses/{course_id}/chat/{session_id}` | 清空会话 | - | `{message}` |
+
+> 说明：`session_id` 由前端生成并在同一课程内复用；最近 6 轮 / 4000 字进入 Prompt，
+> 含指代词的追问会先与上一轮问题拼接再检索。删除课程时会一并清理 `chat_messages`。
 
 ### 4.4 自动出题
 

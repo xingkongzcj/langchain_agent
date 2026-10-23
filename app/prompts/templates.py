@@ -28,22 +28,40 @@ JSON 格式如下：
 {"questions": [{"type": "single", "question": "...", "options": ["A. ...", "B. ..."], "answer": "A", "explanation": "..."}]}"""
 
 
-def build_rag_messages(context: str, question: str) -> list[dict[str, str]]:
+def build_rag_messages(
+    context: str,
+    question: str,
+    history: list[dict[str, str]] | None = None,
+    profile: str | None = None,
+) -> list[dict[str, str]]:
     """构建 RAG 问答的消息列表。
 
     :param context: 检索到的参考资料拼接文本
     :param question: 用户问题
-    :return: 消息列表（system + user）
+    :param history: 本会话历史对话（user/assistant 交替），用于多轮指代
+    :param profile: 学习画像文本（L2），为空则不注入
+    :return: 消息列表（system + [历史] + user）
     """
+    system_prompt = RAG_QA_SYSTEM_PROMPT
+    if profile:
+        system_prompt = f"{system_prompt}\n\n{profile}"
+    if history:
+        system_prompt = (
+            f"{system_prompt}\n\n"
+            "注意：后续历史对话只用于理解追问里的指代关系；"
+            "事实一律以本轮【参考资料】为准，历史回答可能不准确，不要照搬。"
+        )
+
     user_content = (
         f"【参考资料】\n{context}\n\n"
         f"【问题】\n{question}\n\n"
         "请根据以上参考资料回答问题。"
     )
-    return [
-        {"role": "system", "content": RAG_QA_SYSTEM_PROMPT},
-        {"role": "user", "content": user_content},
-    ]
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": user_content})
+    return messages
 
 
 def build_quiz_messages(
@@ -52,6 +70,7 @@ def build_quiz_messages(
     difficulty: str,
     count: int,
     topic: str | None = None,
+    profile: str | None = None,
 ) -> list[dict[str, str]]:
     """构建出题的消息列表。
 
@@ -60,8 +79,16 @@ def build_quiz_messages(
     :param difficulty: 难度（easy/medium/hard）
     :param count: 题目数量
     :param topic: 出题主题（可选）
+    :param profile: 学习画像文本，有薄弱点时提高其出题比重
     :return: 消息列表（system + user）
     """
+    system_prompt = QUIZ_GENERATION_PROMPT
+    if profile:
+        system_prompt = (
+            f"{system_prompt}\n\n{profile}\n"
+            "（若画像中列出了薄弱知识点，请在题目分布上适当提高这些内容的比重。）"
+        )
+
     topic_text = topic or "不限主题"
     user_content = (
         f"【参考资料】\n{context}\n\n"
@@ -73,7 +100,7 @@ def build_quiz_messages(
         f"请严格按照以上参数生成 {count} 道题目。"
     )
     return [
-        {"role": "system", "content": QUIZ_GENERATION_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
 

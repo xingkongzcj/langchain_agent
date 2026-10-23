@@ -155,7 +155,9 @@ pip install -r requirements-dev.txt
 
 - **前端**：「智能问答」Tab，输入问题回车发送，展示 AI 回答 + 引用来源卡片。
 - **实现**：查询加 bge-m3 前缀 → Chroma 相似度检索（top_k）→ 拼接上下文 → LLM 生成，回答可溯源、不编造。
-- **相关 API**：`POST /api/courses/{id}/chat`。
+- **多轮记忆**：会话按课程隔离（前端生成 `session_id`），最近 6 轮 / 4000 字进入上下文；追问里的「它 / 这个 / 刚才」会先用上一轮问题补全检索 query，避免检索不到内容。刷新页面会从服务端恢复对话，也可一键「清空对话」。
+- **学习画像**：从错题本与复习计划聚合出薄弱知识点、已掌握数量、复习进度，注入问答与出题 Prompt（出题会提高薄弱点的比重）。
+- **相关 API**：`POST /api/courses/{id}/chat`、`GET /api/courses/{id}/chat/history`、`DELETE /api/courses/{id}/chat/{session_id}`。
 
 ### F3 自动出题
 

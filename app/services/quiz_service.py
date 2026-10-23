@@ -10,6 +10,7 @@ from app.config import settings
 from app.core.exceptions import BusinessException
 from app.models.quiz import Question, QuizBatch
 from app.prompts.templates import build_quiz_messages
+from app.services import memory_service
 from app.services.llm import get_chat_model
 from app.services.rag_service import retrieve_documents
 
@@ -47,13 +48,15 @@ def generate_quiz(
         f"[片段 {index}]\n{doc.page_content}" for index, doc in enumerate(docs, start=1)
     )
 
-    # 2. 构建 Prompt
+    # 2. 构建 Prompt（注入学习画像：薄弱知识点提高出题比重）
+    profile = memory_service.build_learning_profile(db, course_id)
     messages = build_quiz_messages(
         context=context,
         topic=topic,
         question_type=question_type,
         difficulty=difficulty,
         count=count,
+        profile=profile,
     )
 
     # 3. 生成并解析（带重试）

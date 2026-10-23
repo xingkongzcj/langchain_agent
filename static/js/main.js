@@ -158,11 +158,67 @@ async function uploadDocument(file) {
 function initChat() {
     const sendBtn = document.getElementById("btn-send");
     const input = document.getElementById("chat-input");
+    const clearBtn = document.getElementById("btn-clear-chat");
 
     sendBtn.addEventListener("click", () => sendMessage());
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") sendMessage();
     });
+    if (clearBtn) clearBtn.addEventListener("click", () => clearChatHistory());
+}
+
+// 会话 ID 按课程隔离：刷新页面后仍能找回同一段对话
+function getSessionId(courseId) {
+    const key = `chat_session_${courseId}`;
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+        id =
+            (window.crypto && crypto.randomUUID && crypto.randomUUID()) ||
+            `s-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        sessionStorage.setItem(key, id);
+    }
+    return id;
+}
+
+function resetSessionId(courseId) {
+    sessionStorage.removeItem(`chat_session_${courseId}`);
+    return getSessionId(courseId);
+}
+
+async function loadChatHistory(courseId) {
+    resetChat();
+    try {
+        const sessionId = getSessionId(courseId);
+        const history = await api.get(
+            `/courses/${courseId}/chat/history?session_id=${encodeURIComponent(sessionId)}`
+        );
+        if (!history || history.length === 0) return;
+
+        const container = document.getElementById("chat-messages");
+        container.innerHTML = "";
+        history.forEach((m) => appendMessage(m.role, m.content));
+    } catch (err) {
+        // 历史加载失败不影响正常提问
+    }
+}
+
+async function clearChatHistory() {
+    if (!currentCourse) {
+        alert("请先选择课程");
+        return;
+    }
+    if (!confirm("确定清空当前课程的对话记录吗？此操作不可恢复。")) return;
+
+    const sessionId = getSessionId(currentCourse.id);
+    try {
+        await api.del(
+            `/courses/${currentCourse.id}/chat/${encodeURIComponent(sessionId)}`
+        );
+    } catch (err) {
+        // 清空失败也重置本地会话，避免继续沿用旧上下文
+    }
+    resetSessionId(currentCourse.id);
+    resetChat();
 }
 
 async function sendMessage() {
@@ -185,7 +241,7 @@ async function sendMessage() {
     try {
         const result = await api.post(`/courses/${currentCourse.id}/chat`, {
             question,
-            session_id: null,
+            session_id: getSessionId(currentCourse.id),
         });
         thinkingEl.remove();
         appendMessage("assistant", result.answer, result.sources);
@@ -621,7 +677,7 @@ function selectCourse(course, li) {
     // 手机上选完课程自动收起抽屉，直接回到内容区
     closeMobileSidebar();
     loadDocuments(course.id);
-    resetChat();
+    loadChatHistory(course.id);
     resetQuiz();
     loadMistakes(course.id);
     resetReview();
@@ -697,7 +753,8 @@ async function deleteDocument(doc) {
         await api.del(`/documents/${doc.id}`);
         if (currentCourse) {
             await loadDocuments(currentCourse.id);
-            // 向量已变化，清空对话避免继续引用已删除的内容
+            // 知识库变了，开一段新会话，避免继续引用已删除的内容
+            resetSessionId(currentCourse.id);
             resetChat();
         }
     } catch (err) {

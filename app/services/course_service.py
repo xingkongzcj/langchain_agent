@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import BusinessException
 from app.db.chroma import delete_collection
+from app.models.chat import ChatMessage
 from app.models.course import Course
 from app.models.document import Document as DocumentModel
 from app.models.mistake import Mistake
@@ -106,6 +107,10 @@ def delete_course(db: Session, course_id: int) -> None:
         synchronize_session=False
     )
     db.query(DocumentModel).filter(DocumentModel.course_id == course_id).delete(
+        synchronize_session=False
+    )
+    # 会话历史随课程一起清理（聊天内容含隐私，不留下孤儿记录）
+    db.query(ChatMessage).filter(ChatMessage.course_id == course_id).delete(
         synchronize_session=False
     )
 
